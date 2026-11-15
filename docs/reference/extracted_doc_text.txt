@@ -1,0 +1,198 @@
+RogMitra: AI-ASSISTED PATIENT CASE-TAKING SOFTWARE
+Problem Analysis and Project Design 
+Anya Yadav 
+B.Tech CSE (AI/ML)                         Bennett University                    
+                            
+Sunidhi Srivastava
+B.Tech CSE (Core CS)                        Bennett University                    
+Nupur Yadav
+B.Tech CSE (Full Stack Development)                       Bennett University                    
+Pragya Singh
+B.Tech CSE (AI/ML)                         Bennett University                    
+Krati Budholiya 
+B.Tech CSE (Data Science)                      Bennett University                    
+Ramesh Jangid
+B.Tech CSE (Full Stack Development)Bennett University                    
+Vansh Kaushik
+B.Tech CSE (Cloud)                        Bennett University                    
+Project Guide      Kimmi GuptaSchool of Computer Science & EngineeringBennett UniversityIndia
+ 
+Abstract—This proposed project investigates an AI-based software platform that assists patient case-taking in outpatient departments (OPDs) before the doctor's consultation. Patient history taking is a critical component of clinical consultation; limited consultation time is a constraint, incomplete patient recall, unstructured medical records, and language or literacy barriers. This paper proposes RogMitra, that conducts an adaptive history-taking interaction through voice and touch-based interfaces, digitizes existing medical documents, and generates a structured, physician-editable clinical history summary. The system is intended for documentation support and does not perform autonomous diagnosis. An extended Ayurvedic history mode supports AYUSH settings. The system is intended for documentation support and does not perform autonomous diagnosis. At this stage, the document focuses on problem analysis and system design; no experimental accuracy or final performance claim is reported.
+Keywords—Clinical History Taking, Conversational AI, Speech Recognition, Clinical Note Generation, Medical OCR, Ayurveda, ABDM, FHIR
+I. PROBLEM DOMAIN IDENTIFICATION AND ANALYSIS
+A. Background
+History taking is the structured process of collecting information regarding a patient's presenting complaints, history of present illness, past medical and surgical history, medication and allergy history, family and personal history, and review of systems. It is widely regarded as one of the most important diagnostic activities in clinical medicine. The Indian 
+Government Hospital OPDs have very limited time for this. Large tertiary hospitals may receive thousands of OPD patients each day, resulting in short consultation windows [1]. Within this window, the physician must elicit history, examine the patient, review prior records, decide on management, and counsel the patient. This can lead to incomplete history, missed comorbidities, and repeated questioning across visits.
+The challenge becomes more complex in AYUSH and Ayurvedic healthcare settings, where patient assessment may require additional information beyond conventional clinical history. Parameters such as Prakriti, Vikriti, Agni, Koshta, and Aahara-Vihara may need to be documented along with symptoms, previous treatments, laboratory reports, and other relevant clinical information, which need a much more detailed history than routine intake [2]. Parameters such as Prakriti, Vikriti, Agni, Koshta, and Aahara-Vihara may need to be documented along with symptoms, previous treatments, laboratory reports, and other relevant clinical information. These records may exist in handwritten or paper-based formats and may be documented using different languages, making manual organization and retrieval time-consuming. 
+The Ayushman Bharat Digital Mission (ABDM) has established a framework for digital health records and interoperability through components such as ABHA and FHIR-based healthcare information 
+exchange. However, a patient-facing system specifically designed to collect structured clinical history and organize existing medical documents before the physician consultation remains an important area for exploration.
+RogMitra is proposed in this context. The idea is to shift part of the information collection process to the period before the actual consultation. The patient can interact with the system using voice or touch, while the consultant receives a structured summary that can be reviewed before continuing with the further consultation. 
+B. Problem Statement
+We want to design RogMitra—a smart software platform where patients records their medical history through voice conversation or simple touch screens. It digitizes old paper documents and creates an editable summary for doctors before consultation starts. The system will collect relevant clinical information, processes existing medical documents , extracts useful information from them which can further be used for consultation and organize the information into a structured history. It will further generate a concise clinical summary for the consultant. Plus, it links seamlessly with hospital systems and ABHA records.
+The main goal is not to automate diagnosis, but to focus on making the initial history taking process and documentation a bit more organized.
+C. Problem Analysis
+The main issues identified in the existing process are given below.
+• A physician may not have enough time to collect a complete medical history manually during a busy OPD session.
+• Previous prescriptions, laboratory reports, discharge summaries, and handwritten notes may exist in different formats and locations.
+• Ayurvedic evaluation takes too long and fails in fast-paced OPD settings.
+• Current registration systems only collect basic details like name and token number.
+• Many OPD patients are elderly, rural or low-literacy users, so a text-only or app-based tool may not be usable.
+• Information often is written or entered manually even when similar information has already been provided in earlier consultations.
+• Health data must be handled with consent and privacy safeguards under the Digital Personal Data Protection Act 2023 and the ABDM consent framework [3].
+D. Scope
+The scope of RogMitra is limited to pre-consultation patient history collection and clinical documentation.
+The proposed system will cover voice and touch based history interview, red-flag alerting, an Ayurvedic history mode, document digitization with entity extraction, structured summary generation, and consent and FHIR-based integration design. It will not diagnose diseases, prescribe treatment or replace the physician. All summaries are drafts that the physician can accept, edit or reject.
+For AYUSH-oriented settings, the system will include an extended history module covering relevant Ayurvedic parameters.
+RogMitra will not be diagnosing diseases or prescribing medicines. Neither will it make decisions on behalf of the consultant. The output generated by the system will be treated as a draft and will require physician review before it is used as part of clinical documentation. All summaries are drafts that the physician can accept, edit, or reject.
+II. REVIEW OF EXISTING SYSTEMS AND PROJECT FEASIBILITY
+A. Existing Systems / Approaches
+A review was carried out to check the existing healthcare systems and AI-based patient-interaction tools to understand what is already available and where the ap lies. Let's look at what's out there right now:
+Existing Approach
+Key Function
+Identified Limitation
+Ada Health
+AI-based symptom assessment.
+Great for symptom assessment but not designed for complete case-taking in crowded hospital OPD workflows.
+Infermedica
+AI-driven symptom interview, medical history collection and triage.
+Focuses mainly on triage and symptom checking. Completely lacks Ayurvedic modes or Indian medical document digitization.
+NextGen eHospital
+Broader hospital-management and clinical-record system.
+Record-oriented; not a dedicated patient-facing AI history-taking tool.
+Hospital registration systems
+Capture name, age, department and token number.
+Only collects basic demographic data and appointment tokens. No clinical history features.
+Generic document scanners
+Digitize documents as images.
+Converts papers into image files, but cannot extract or structure clinical timelines.
+B. Research / Technology Gap
+Existing tools focus on diagnosis or plain records. Nobody brings together (i) voice and touch for low-literacy users, (ii) Ayurvedic intake, (iii) OCR digitization of messy papers, and (iv) ABHA/FHIR integration in one single workflow. That’s the exact gap RogMitra fills. The proposed approach therefore combines four major areas:
+Voice and touch interaction for patients with different levels of literacy and technological familiarity. 
+Adaptive history taking, where subsequent questions can depend on the information already provided by the patient. 
+Medical document digitization, allowing information from existing prescriptions, reports, and other records to be extracted and organized. 
+Structured clinical summarization, where the collected information is converted into a concise format that can be reviewed by the physician.
+Whether the proposed approach gives useful results will be examined experimentally rather than assumed.
+C. Project Feasibility
+Technical Feasibility: Pretrained voice models like Whisper and AI4Bharat, open-source LLMs, OCR engines, and FHIR standards are already available. 
+Operational Feasibility: A patient can complete the interview on a kiosk or personal device before the consultation, and the physician reviews the editable summary on the consultation screen.
+Resource Feasibility: Prototype development is totally doable with free GPU tools and synthetic datasets. No live patient data needed yet.
+.
+III. Proposed System Design
+A. Architecture Overview RogMitra follows a modular pipeline with five layers:
+Interaction layer: This is where the patient interacts. It uses multilingual voice and touchscreens along with text-to-speech prompts.
+Conversation engine: An adaptive questioning module. It uses a clinical history ontology to decide what to ask next based on old responses, plus it raises red-flag alerts if something looks dangerous.
+Document intelligence module: Patients can upload or scan their previous medical records through the system. OCR is used to convert these documents into machine-readable text. The system then identifies useful information such as medicines, dosages, diagnoses, laboratory values, and dates.
+Summary generator: It takes everything from the interview and scanned documents to create a structured draft summary that doctors can easily edit.
+Integration and consent layer: This layer handles patient consent and the exchange of structured health information. The proposed design considers ABHA linking, FHIR-based resource mapping, and possible integration with hospital information systems (HIS). Any exchange of patient information would be subject to appropriate consent, authorization, and security requirements.
+B. Patient and Physician Workflow
+First, the patient registers and gives consent on the system. They complete the voice interview in whatever language they are comfortable in, scan their old paper records, and check a simple confirmation screen. Once done, the physician sees a structured draft summary on their screen with critical red flags highlighted. The doctor can quickly accept, edit, or reject the note before saving it into the system.
+C. Ayurvedic History Mode For AYUSH and Ayurvedic consultations, RogMitra can operate in an extended history-taking mode. In this mode, the conversation engine uses an additional question bank designed around Ayurvedic assessment requirements. The question set can cover areas such as Dashavidha Pariksha, Prakriti, Vikriti, Agni, Koshtha, and Ahara-Vihara. The questions can be presented gradually instead of asking the patient to provide all the information at once. This makes the interaction easier to follow and allows later questions to depend on earlier responses. The Ayurvedic question bank and its structure should be reviewed and validated by a qualified Ayurvedic practitioner before being used for clinical purposes.
+D. Data Design and Interoperability
+All interview answers and extracted entities gets mapped directly into standard FHIR resources—such as Patient, Condition, Allergy Intolerance, Medication Statement, and Observation. This makes sure the data is fully aligned with ABDM standards and can be shared across health systems easily.
+IV. OBJECTIVES AND METHODOLOGY OF THE PROPOSED WORK
+A. Objectives
+The proposed work focuses on developing RogMitra as a pre-consultation system that can collect patient information, process previous medical records, and prepare a structured history for the physician. The main objectives are:
+Figure out why clinical history-taking is such a massive bottleneck in Indian OPDs.
+Set up an instant red-flag alert system for emergency symptoms.
+To design an adaptive voice- and touch-based history-taking system using a structured clinical history ontology.
+To develop a document-processing pipeline that can digitize, extract, and organize information from previous medical records.
+Develop a summary generator that outputs a clean, editable note for doctors.
+Build a smart voice and touchscreen interview setup based on a proper clinical ontology.
+B. Proposed Methodology
+Data Collection: The project will use multiple datasets for different parts of the system. MTS-Dialog will be used for training the clinical summary-generation component, while ACI-Bench will be used for external evaluation. Synthea [10] will be used to generate synthetic patient profiles, medical records, and FHIR-format data.
+Most of these datasets are based on English-language and Western clinical settings. Therefore, Hindi and Ayurvedic examples will be generated synthetically for the relevant modules. These examples will be reviewed and validated by a domain expert to improve their clinical and contextual relevance.
+Preprocessing: Dialogue-note pairs will be cleaned and mapped to a common section format. ACI-Bench SOAP-style notes will be mapped to the history sections used in this project for evaluation.
+Speech input is converted to text by ASR. A dialogue manager tracks which history fields are filled and asks the next relevant question. Symptom-specific follow-ups follow the SOCRATES framework. Every question can be answered by speaking or tapping.
+Uploaded documents are processed by OCR, and an LLM extracts diagnoses, medicines with dosage, investigation values and procedures into a fixed JSON schema. Dates are used to build a timeline, and values outside reference ranges are highlighted.
+A sequence-to-sequence model or LoRA-tuned LLM generates the structured summary from the conversation and extracted document data.
+Patient authentication through ABHA, granular consent, FHIR mapping of the summary, and deletion of temporary session data after submission.
+Evaluation: We will measure summary quality, ASR performance, entity extraction accuracy, and overall history coverage.
+IV. OBJECTIVES AND METHODOLOGY OF THE PROPOSED WORK (CONTINUED)
+C. Proposed System Pipeline
+Fig 2. proposed pipeline of the RogMitra case-taking system
+Main architecture of the above proposed RogMitra workflow. The arrow shows the flow of information ,how the data flow or moves from patient to consultant’s approval and then to the final integration of the system.
+D. Data Flow
+           
+         Fig 3. proposed data-flow diagram of the RogMitra system
+The response which patient gives through speech or touch are mapped into structural fields, and further that converted into structural uploaded documents. Then they are combined into a single case record which formed into summary. Once the consultant reviewed the generated summary, it is sent to then HIS and also attached to the patient’s ABHA record, with the exact fields and formats will be fixed during implementation.
+IV. RELEVANCE OF ALGORITHMS / TECHNIQUES
+The following techniques are candidate methods. Final selection will depend on validation results, language coverage, computational limits and interpretability
+.
+Algorithm / Technique
+Proposed Use
+Relevance
+ASR (Whisper, AI4Bharat models)
+Speech conversion
+Pretrained models support multilingual speech recognition [4].
+Ontology-constrained dialogue manager
+Selections of important questions.
+Ensures no required history field is missed and keeps questions clinically relevant.
+Rule-based and LLM red-flag detection
+Alerts generated for emergency
+Rules give predictable behaviour for critical symptoms; LLM handles varied phrasing.
+OCR engine
+Printed and handwritten document digitization
+Converts scanned documents into machine-readable text.
+LLM-based information extraction
+Structured entities from OCR text
+Produces diagnoses, medicines and lab values in a fixed schema.
+Flan-T5 / BART / LoRA-tuned LLM
+Clinical note generation
+Fine-tuning on dialogue-note pairs is an established approach [5], [6].
+FHIR mapping
+Interoperability
+Aligns output with ABDM standards [3], [7].
+B. Evaluation Strategy
+• Summary quality: ROUGE [8] and BERT Score [9], plus section-wise coverage, on MTS-Dialog test sets and ACI-Bench.
+• ASR:Word rate error on various languages are measured.
+• Document extraction: Evaluation through many field level recall.,F1 score and precision.
+• Interview quality: Checking through a history coverage score, from Synthea profiles that is LLM simulated patients.
+• Physical review: Physicians will review the sample of summaries, wherever possible.
+C. Proposed System Architecture
+                                                                 
+                          Fig 4.   High-level proposed system architecture of the RogMitra system    
+D. Ethical and Practical Considerations
+• The platform assist with the documentation and not with any diagnosis.
+• The physician can approve or modify the generated summary
+• Explicit, revocable consent is taken, with audio explanation for low-literacy users.
+• Temporary session data is cleared after submission, in line with the DPDP Act 2023.
+• Make sure that the patient privacy is not at risk.
+• Model limitations for Hindi, handwritten texts will be openly reported.
+V. EXPECTED OUTCOMES
+• A functional prototype is expected.
+• The prototype should generate end to end final summary.
+•  Producing  a medical timeline with abnormal values flagged.
+• After implementation candidate model is required to compare.
+• The system is there to support physician rather than replacing clinical judgement ..
+                                                   
+VI. EXPECTED OUTCOMES (CONTINUED)
+A. Expected Deliverables
+Deliverable
+Description
+Module takes history
+A red flag .
+Ayurvedic question bank
+Dashavidha Pariksha and Ahara-Vihara question set for expert validation.
+Document module
+Entity extraction pipeline with timeline view.
+Summary model
+Evaluation results with trained summary .
+Integration design
+ FHIR/ABHA mapping and consent .
+Documentation
+Methodology and technical design .
+VII. REFERENCES
+[1] G. Irving et al., "International variations in primary care physician consultation time: a systematic review of 67 countries," BMJ Open, vol. 7, no. 10, e017902, 2017.
+[2] Charaka Samhita (Vimana Sthana, Dashavidha Pariksha), classical Ayurvedic text.
+[3] National Health Authority, Ayushman Bharat Digital Mission (ABDM) documentation; Government of India, Digital Personal Data Protection Act, 2023.
+[4] A. Radford et al., "Robust Speech Recognition via Large-Scale Weak Supervision," in Proc. ICML, 2023.
+[5] A. Ben Abacha, W. Yim, Y. Fan and T. Lin, "An Empirical Study of Clinical Note Generation from Doctor-Patient Encounters," in Proc. EACL, 2023.
+[6] W. Yim et al., "ACI-BENCH: a Novel Ambient Clinical Intelligence Dataset for Benchmarking Automatic Visit Note Generation," Scientific Data, vol. 10, 2023.
+[7] HL7 International, FHIR (Fast Healthcare Interoperability Resources) Specification.
+[8] C.-Y. Lin, "ROUGE: A Package for Automatic Evaluation of Summaries," in Text Summarization Branches Out, 2004.
+[9] T. Zhang et al., "BERTScore: Evaluating Text Generation with BERT," in Proc. ICLR, 2020.
+[10] J. Walonoski et al., "Synthea: An approach, method, and software mechanism for generating synthetic patients and the synthetic electronic health record," J. Am. Med. Inform. Assoc., vol. 25, no. 3, pp. 230–238, 2018.
+VIII. CONCLUSION OF THE PROPOSED DESIGN
+In this document, the initial design for the RogMitra system – an AI-based system that is supposed to help with patient case-taking – is outlined. The problem domain, feasibility, objectives, methodology, algorithm candidates, processing pipeline, and evaluation approach are defined before the implementation of the system.
+The next step is dedicated to dataset preparation, modules’ development and implementation, and validation.
+Note at the Proposal Stage: The numbers about accuracy and experimental results and any statements about the full implementation of the system will not be provided at this stage.
