@@ -10,7 +10,8 @@ export const RED_FLAG_DEFINITIONS = [
       /\b(chest pain|chest tightness|pressure in chest|heart pain|angina|pain radiating to (left arm|jaw)|crushing chest)\b/i
     ],
     patternsHi: [
-      /(छाती में दर्द|सीने में दर्द|सीने में जकड़न|सीने पर दबाव|दिल में दर्द|बाएं हाथ में दर्द)/
+      /(छाती|सीने|दिल)[^\.\,\!\?]{0,25}(दर्द|जकड़न|दबाव)/,
+      /(बाएं\s+हाथ\s+में\s+दर्द)/
     ],
     messageEn: 'Severe / Acute Chest Pain or Pressure detected. Potential cardiac emergency.',
     messageHi: 'सीने में तेज दर्द या दबाव का पता चला है। यह आपातकालीन स्थिति हो सकती है।',
