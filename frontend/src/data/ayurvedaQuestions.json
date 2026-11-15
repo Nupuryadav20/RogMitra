@@ -1,0 +1,193 @@
+{
+  "_meta": {
+    "prototype": true,
+    "disclaimer_en": "This Ayurvedic questionnaire is a JSON prototype for research and educational purposes ONLY. It is NOT a clinical tool and must NOT be used for diagnosis or treatment. Consult a qualified Ayurvedic practitioner (BAMS/MD-Ayurveda).",
+    "disclaimer_hi": "यह आयुर्वेदिक प्रश्नावली केवल शोध और शैक्षिक उद्देश्यों के लिए JSON प्रोटोटाइप है। यह नैदानिक उपकरण नहीं है और इसका उपयोग निदान या उपचार के लिए नहीं किया जाना चाहिए। एक योग्य आयुर्वेदिक चिकित्सक से परामर्श करें।",
+    "version": "1.0.0",
+    "pillars": ["prakriti", "vikriti", "agni", "koshta", "aahara_vihara"]
+  },
+
+  "pillars": [
+    {
+      "id": "prakriti",
+      "label_en": "Prakriti (Constitution)",
+      "label_hi": "प्रकृति (संविधान)",
+      "description_en": "Your innate constitutional type, determined at birth. Reflects the balance of Vata, Pitta, and Kapha doshas.",
+      "description_hi": "आपका जन्मजात संवैधानिक प्रकार, जन्म के समय निर्धारित। वात, पित्त और कफ दोषों के संतुलन को दर्शाता है।",
+      "questions": [
+        {
+          "id": "P1Q1",
+          "question_en": "How would you describe your body frame?",
+          "question_hi": "आप अपने शरीर की बनावट को कैसे बताएंगे?",
+          "options": [
+            { "id": "A", "text_en": "Thin, light, difficult to gain weight", "text_hi": "पतला, हल्का, वज़न बढ़ाना मुश्किल", "dosha": "vata", "score": 2 },
+            { "id": "B", "text_en": "Medium, muscular, moderate weight", "text_hi": "मध्यम, मांसल, सामान्य वज़न", "dosha": "pitta", "score": 2 },
+            { "id": "C", "text_en": "Broad, heavy, tends to gain weight easily", "text_hi": "चौड़ा, भारी, आसानी से वज़न बढ़ता है", "dosha": "kapha", "score": 2 }
+          ]
+        },
+        {
+          "id": "P1Q2",
+          "question_en": "How is your skin texture?",
+          "question_hi": "आपकी त्वचा की बनावट कैसी है?",
+          "options": [
+            { "id": "A", "text_en": "Dry, rough, prone to cracking", "text_hi": "सूखी, खुरदरी, दरारें पड़ने की प्रवृत्ति", "dosha": "vata", "score": 2 },
+            { "id": "B", "text_en": "Warm, oily, prone to rashes or acne", "text_hi": "गर्म, तैलीय, दाने या मुंहासों की प्रवृत्ति", "dosha": "pitta", "score": 2 },
+            { "id": "C", "text_en": "Smooth, moist, cool to touch", "text_hi": "चिकनी, नम, स्पर्श में ठंडी", "dosha": "kapha", "score": 2 }
+          ]
+        },
+        {
+          "id": "P1Q3",
+          "question_en": "How is your natural energy and activity level?",
+          "question_hi": "आपकी प्राकृतिक ऊर्जा और गतिविधि स्तर कैसा है?",
+          "options": [
+            { "id": "A", "text_en": "Irregular bursts of energy, quick to tire", "text_hi": "अनियमित ऊर्जा के झटके, जल्दी थक जाना", "dosha": "vata", "score": 2 },
+            { "id": "B", "text_en": "Moderate, goal-oriented, competitive", "text_hi": "मध्यम, लक्ष्य-उन्मुख, प्रतिस्पर्धी", "dosha": "pitta", "score": 2 },
+            { "id": "C", "text_en": "Steady, calm, slow but sustained energy", "text_hi": "स्थिर, शांत, धीमी लेकिन निरंतर ऊर्जा", "dosha": "kapha", "score": 2 }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "vikriti",
+      "label_en": "Vikriti (Current Imbalance)",
+      "label_hi": "विकृति (वर्तमान असंतुलन)",
+      "description_en": "Your current state of doshic imbalance — what is aggravated right now due to diet, lifestyle, stress, or season.",
+      "description_hi": "आपकी वर्तमान दोष असंतुलन की स्थिति — आहार, जीवनशैली, तनाव, या मौसम के कारण अभी क्या बढ़ा हुआ है।",
+      "questions": [
+        {
+          "id": "P2Q1",
+          "question_en": "Which of these symptoms are you currently experiencing most?",
+          "question_hi": "आप इनमें से कौन से लक्षण अभी सबसे अधिक अनुभव कर रहे हैं?",
+          "options": [
+            { "id": "A", "text_en": "Anxiety, dryness, constipation, disturbed sleep", "text_hi": "चिंता, रूखापन, कब्ज़, नींद में गड़बड़ी", "dosha": "vata", "score": 2 },
+            { "id": "B", "text_en": "Irritability, inflammation, heartburn, skin rash", "text_hi": "चिड़चिड़ापन, सूजन, जलन, त्वचा पर दाने", "dosha": "pitta", "score": 2 },
+            { "id": "C", "text_en": "Lethargy, congestion, weight gain, sluggishness", "text_hi": "सुस्ती, जमाव, वज़न बढ़ना, धीमापन", "dosha": "kapha", "score": 2 }
+          ]
+        },
+        {
+          "id": "P2Q2",
+          "question_en": "How has your mental state been recently?",
+          "question_hi": "हाल ही में आपकी मानसिक स्थिति कैसी रही है?",
+          "options": [
+            { "id": "A", "text_en": "Scattered, fearful, worried, forgetful", "text_hi": "बिखरा हुआ, डरा हुआ, चिंतित, भूलने वाला", "dosha": "vata", "score": 2 },
+            { "id": "B", "text_en": "Angry, frustrated, critical, perfectionist", "text_hi": "क्रोधी, निराश, आलोचनात्मक, पूर्णतावादी", "dosha": "pitta", "score": 2 },
+            { "id": "C", "text_en": "Dull, attached, overly sentimental, depressed", "text_hi": "सुस्त, आसक्त, अत्यधिक भावुक, उदास", "dosha": "kapha", "score": 2 }
+          ]
+        },
+        {
+          "id": "P2Q3",
+          "question_en": "How has your digestion been in the past month?",
+          "question_hi": "पिछले महीने आपका पाचन कैसा रहा है?",
+          "options": [
+            { "id": "A", "text_en": "Irregular — sometimes fine, sometimes bloated or gassy", "text_hi": "अनियमित — कभी ठीक, कभी फूलन या गैस", "dosha": "vata", "score": 2 },
+            { "id": "B", "text_en": "Intense — frequent hunger, acid reflux, loose stools", "text_hi": "तीव्र — बार-बार भूख, एसिड रिफ्लक्स, पतले दस्त", "dosha": "pitta", "score": 2 },
+            { "id": "C", "text_en": "Slow — heavy feeling after meals, low appetite", "text_hi": "धीमा — खाने के बाद भारीपन, कम भूख", "dosha": "kapha", "score": 2 }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "agni",
+      "label_en": "Agni (Digestive Fire)",
+      "label_hi": "अग्नि (पाचन अग्नि)",
+      "description_en": "Agni is the metabolic and digestive intelligence. It governs how we process food, emotions, and experiences.",
+      "description_hi": "अग्नि चयापचय और पाचन बुद्धि है। यह नियंत्रित करती है कि हम भोजन, भावनाओं और अनुभवों को कैसे संसाधित करते हैं।",
+      "questions": [
+        {
+          "id": "P3Q1",
+          "question_en": "How would you describe your appetite?",
+          "question_hi": "आप अपनी भूख को कैसे बताएंगे?",
+          "options": [
+            { "id": "A", "text_en": "Variable — sometimes hungry, sometimes not at all (Vishama Agni)", "text_hi": "परिवर्तनशील — कभी भूख, कभी बिल्कुल नहीं (विषम अग्नि)", "agni_type": "vishama", "score": 1 },
+            { "id": "B", "text_en": "Sharp and intense — very hungry, irritable if delayed (Tikshna Agni)", "text_hi": "तीव्र — बहुत भूख, देरी होने पर चिड़चिड़ापन (तीक्ष्ण अग्नि)", "agni_type": "tikshna", "score": 1 },
+            { "id": "C", "text_en": "Consistently poor — rarely hungry (Manda Agni)", "text_hi": "लगातार कम — शायद ही कभी भूख (मंद अग्नि)", "agni_type": "manda", "score": 1 },
+            { "id": "D", "text_en": "Regular and balanced — healthy hunger at meal times (Sama Agni)", "text_hi": "नियमित और संतुलित — भोजन के समय स्वस्थ भूख (सम अग्नि)", "agni_type": "sama", "score": 1 }
+          ]
+        },
+        {
+          "id": "P3Q2",
+          "question_en": "How do you feel after eating a full meal?",
+          "question_hi": "भरपेट खाना खाने के बाद आप कैसा महसूस करते हैं?",
+          "options": [
+            { "id": "A", "text_en": "Bloated, gassy, discomfort — unpredictable", "text_hi": "फूला हुआ, गैस, असुविधा — अप्रत्याशित", "agni_type": "vishama", "score": 1 },
+            { "id": "B", "text_en": "Satisfied quickly but acid or burning sensation possible", "text_hi": "जल्दी संतुष्टि लेकिन एसिड या जलन संभव", "agni_type": "tikshna", "score": 1 },
+            { "id": "C", "text_en": "Heaviness, lethargy, want to sleep", "text_hi": "भारीपन, सुस्ती, नींद आना चाहता है", "agni_type": "manda", "score": 1 },
+            { "id": "D", "text_en": "Light, energized, comfortable", "text_hi": "हल्का, ऊर्जावान, आरामदायक", "agni_type": "sama", "score": 1 }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "koshta",
+      "label_en": "Koshta (Bowel Type)",
+      "label_hi": "कोष्ठ (आंत्र प्रकार)",
+      "description_en": "Koshta refers to the natural tendency of the gastrointestinal tract — how easily stools pass and the nature of elimination.",
+      "description_hi": "कोष्ठ जठरांत्र पथ की प्राकृतिक प्रवृत्ति को दर्शाता है — मल कितनी आसानी से निकलता है और उत्सर्जन की प्रकृति।",
+      "questions": [
+        {
+          "id": "P4Q1",
+          "question_en": "How often do you typically have a bowel movement?",
+          "question_hi": "आप सामान्यतः कितनी बार मल त्याग करते हैं?",
+          "options": [
+            { "id": "A", "text_en": "Less than once a day — often hard or dry stools (Krura Koshta)", "text_hi": "दिन में एक बार से कम — अक्सर कठोर या सूखा मल (क्रूर कोष्ठ)", "koshta": "krura", "score": 1 },
+            { "id": "B", "text_en": "2–3 times a day — soft or loose stools (Mridu Koshta)", "text_hi": "दिन में 2-3 बार — मुलायम या ढीला मल (मृदु कोष्ठ)", "koshta": "mridu", "score": 1 },
+            { "id": "C", "text_en": "Once a day, well-formed — comfortable (Madhyama Koshta)", "text_hi": "दिन में एक बार, सुगठित — आरामदायक (मध्यम कोष्ठ)", "koshta": "madhyama", "score": 1 }
+          ]
+        },
+        {
+          "id": "P4Q2",
+          "question_en": "Do you experience discomfort around bowel movements?",
+          "question_hi": "क्या आपको मल त्याग के दौरान असुविधा होती है?",
+          "options": [
+            { "id": "A", "text_en": "Yes — straining, dryness, or incomplete evacuation", "text_hi": "हाँ — ज़ोर लगाना, रूखापन, या अधूरा निकास", "koshta": "krura", "score": 1 },
+            { "id": "B", "text_en": "Sometimes — urgency or loose consistency", "text_hi": "कभी-कभी — अत्यावश्यकता या ढीली स्थिरता", "koshta": "mridu", "score": 1 },
+            { "id": "C", "text_en": "No — smooth and comfortable", "text_hi": "नहीं — सुचारू और आरामदायक", "koshta": "madhyama", "score": 1 }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "aahara_vihara",
+      "label_en": "Aahara-Vihara (Diet & Lifestyle)",
+      "label_hi": "आहार-विहार (आहार और जीवनशैली)",
+      "description_en": "Assessment of current dietary habits and lifestyle routines that influence doshic balance.",
+      "description_hi": "वर्तमान आहार की आदतों और जीवनशैली की दिनचर्या का आकलन जो दोष संतुलन को प्रभावित करती हैं।",
+      "questions": [
+        {
+          "id": "P5Q1",
+          "question_en": "What best describes your typical diet?",
+          "question_hi": "आपके सामान्य आहार का सबसे अच्छा वर्णन क्या है?",
+          "options": [
+            { "id": "A", "text_en": "Irregular meals, cold or dry food, frequent snacking", "text_hi": "अनियमित भोजन, ठंडा या सूखा खाना, बार-बार नाश्ता", "dosha": "vata", "score": 1 },
+            { "id": "B", "text_en": "Spicy, fried, or sour food; prefer hot food", "text_hi": "मसालेदार, तला हुआ, या खट्टा खाना; गर्म खाना पसंद", "dosha": "pitta", "score": 1 },
+            { "id": "C", "text_en": "Heavy, oily, sweet food; eat even when not hungry", "text_hi": "भारी, चिकना, मीठा खाना; भूख न होने पर भी खाना", "dosha": "kapha", "score": 1 }
+          ]
+        },
+        {
+          "id": "P5Q2",
+          "question_en": "What is your sleep pattern like?",
+          "question_hi": "आपका नींद का पैटर्न कैसा है?",
+          "options": [
+            { "id": "A", "text_en": "Light, interrupted, difficult to fall asleep or stay asleep", "text_hi": "हल्की, बाधित, सोना या सोते रहना मुश्किल", "dosha": "vata", "score": 1 },
+            { "id": "B", "text_en": "Moderate — wake up feeling hot or with active dreams", "text_hi": "मध्यम — गर्म महसूस करके या सक्रिय सपनों के साथ जागना", "dosha": "pitta", "score": 1 },
+            { "id": "C", "text_en": "Heavy — sleep long, difficult to wake up, feel groggy", "text_hi": "गहरी — लंबी नींद, जागना मुश्किल, उनींदापन", "dosha": "kapha", "score": 1 }
+          ]
+        },
+        {
+          "id": "P5Q3",
+          "question_en": "How much physical activity do you do?",
+          "question_hi": "आप कितनी शारीरिक गतिविधि करते हैं?",
+          "options": [
+            { "id": "A", "text_en": "Irregular — sometimes active, sometimes not at all", "text_hi": "अनियमित — कभी सक्रिय, कभी बिल्कुल नहीं", "dosha": "vata", "score": 1 },
+            { "id": "B", "text_en": "Regular, intense exercise — competitive or goal-driven", "text_hi": "नियमित, तीव्र व्यायाम — प्रतिस्पर्धी या लक्ष्य-प्रेरित", "dosha": "pitta", "score": 1 },
+            { "id": "C", "text_en": "Minimal — prefer rest; occasional slow walks", "text_hi": "न्यूनतम — आराम पसंद; कभी-कभी धीमी सैर", "dosha": "kapha", "score": 1 }
+          ]
+        }
+      ]
+    }
+  ]
+}
