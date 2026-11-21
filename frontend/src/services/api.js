@@ -132,26 +132,39 @@ export const consentApi = {
 export const sessionApi = {
   startSession: async (patientId, language = 'en') => {
     try {
-      const res = await apiClient.post('/session/start', { patientId, language });
+      const res = await apiClient.post('/session/start', null, { params: { patientId, language } });
       return res.data;
     } catch (err) {
       console.warn('Session start fallback:', err.message);
-      return { id: `sess-${Date.now()}`, patient_id: patientId, status: 'in_progress' };
+      return { sessionId: `sess-${Date.now()}`, patient_id: patientId, status: 'in_progress' };
     }
   },
 
-  saveAnswer: async (sessionId, fieldName, answerText, inputMode = 'touch') => {
+  saveAnswer: async (sessionId, fieldName, answerText, inputMode = 'touch', questionText = '', questionSource = 'rule-based', language = 'en') => {
     try {
       const res = await apiClient.post('/session/answer', {
         sessionId,
         fieldName,
+        questionText,
+        questionSource,
         answerText,
-        inputMode
+        inputMode,
+        language
       });
       return res.data;
     } catch (err) {
       console.warn('Session save answer fallback:', err.message);
       return { success: true };
+    }
+  },
+
+  getNextQuestion: async (sessionId, language = 'en') => {
+    try {
+      const res = await apiClient.get(`/session/${sessionId}/next-question?language=${language}`);
+      return res.data;
+    } catch (err) {
+      console.warn('Get next question fallback:', err.message);
+      return null;
     }
   },
 

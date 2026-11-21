@@ -13,8 +13,8 @@ export const INITIAL_QUESTIONS = [
     id: 'chief_complaint',
     step: 'symptoms',
     field: 'chief_complaint',
-    questionEn: 'Tell me about your current health problem. What brings you to the hospital today?',
-    questionHi: 'कृपया अपनी वर्तमान स्वास्थ्य समस्या के बारे में बताएं। आज अस्पताल आने का मुख्य कारण क्या है?',
+    questionEn: 'What health problem are you facing today? Please describe it in your own words.',
+    questionHi: 'आज आप किस स्वास्थ्य समस्या का सामना कर रहे हैं? कृपया इसे अपने शब्दों में बताएं।',
     exampleChips: [
       { en: 'I have a headache since 3 days', hi: 'मुझे 3 दिनों से सिरदर्द है' },
       { en: 'I feel fever and body pain', hi: 'मुझे बुखार और शरीर में दर्द महसूस हो रहा है' },

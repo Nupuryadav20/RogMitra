@@ -11,8 +11,10 @@ class AnswerSubmitSchema(BaseModel):
     sessionId: str
     fieldName: str
     questionText: Optional[str] = None
+    questionSource: Optional[str] = "rule-based" # 'rule-based' or 'llm-generated'
     answerText: str
     inputMode: str = "voice" # 'voice' or 'touch'
+    language: Optional[str] = "en"
 
 class DialogueTurnSchema(BaseModel):
     sessionId: str

@@ -26,6 +26,11 @@ try:
                 conn.commit()
             except Exception:
                 pass
+        try:
+            conn.execute(text("ALTER TABLE interview_answers ADD COLUMN question_source TEXT DEFAULT 'rule-based'"))
+            conn.commit()
+        except Exception:
+            pass
 except Exception:
     pass
 

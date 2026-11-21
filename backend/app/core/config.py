@@ -22,9 +22,15 @@ class Settings(BaseSettings):
     DEMO_OTP: str = "123456"
     DEMO_LOGIN_OPEN: bool = True
 
+    # LLM Provider Configuration (gemini | ollama | none)
+    LLM_PROVIDER: str = "none"
+    GEMINI_API_KEY: str = ""
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3"
+
     model_config = SettingsConfigDict(
         case_sensitive=True,
-        env_file=".env",
+        env_file=[".env", "backend/.env"],
         extra="allow"
     )
 

@@ -80,6 +80,7 @@ class InterviewAnswer(Base):
     session_id = Column(String(36), ForeignKey("interview_sessions.id"), nullable=False)
     field_name = Column(String(50), nullable=False)
     question_text = Column(Text, nullable=True)
+    question_source = Column(String(30), default="rule-based") # 'rule-based' or 'llm-generated'
     answer_text = Column(Text, nullable=False)
     input_mode = Column(String(20), default="voice") # 'voice' or 'touch'
     source_tag = Column(String(20), default="patient-reported")

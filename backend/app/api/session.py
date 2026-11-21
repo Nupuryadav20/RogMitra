@@ -9,6 +9,7 @@ from app.db.models import (
     RedFlagAlert, AuditLog
 )
 from app.schemas.session import AnswerSubmitSchema
+from app.services.dialogue.manager import DialogueManager
 
 router = APIRouter(prefix="/session", tags=["Interview Session"])
 
@@ -16,6 +17,7 @@ router = APIRouter(prefix="/session", tags=["Interview Session"])
 def start_session(patientId: str, language: str = "en", db: Session = Depends(get_db)):
     """
     Start a new case-taking interview session for a patient.
+    Rule 1: The first question is non-negotiable and always asks for the chief complaint.
     """
     user = db.query(User).filter(User.id == patientId).first()
     if not user:
@@ -32,27 +34,59 @@ def start_session(patientId: str, language: str = "en", db: Session = Depends(ge
     db.commit()
     db.refresh(session)
 
+    first_q = DialogueManager.get_first_question(language=language)
+
     return {
         "sessionId": session.id,
         "patientId": session.patient_id,
         "status": session.status,
         "language": session.language,
-        "startedAt": session.started_at.isoformat()
+        "startedAt": session.started_at.isoformat(),
+        "firstQuestion": first_q
     }
+
+@router.get("/{sessionId}/next-question")
+def get_next_question(sessionId: str, language: str = "en", db: Session = Depends(get_db)):
+    """
+    Returns the next adaptive SOCRATES question or systemic history question for the session.
+    """
+    session = db.query(InterviewSession).filter(InterviewSession.id == sessionId).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session not found")
+
+    answers = {a.field_name: a.answer_text for a in session.answers}
+    if not answers:
+        return DialogueManager.get_first_question(language=language)
+
+    last_ans = session.answers[-1] if session.answers else None
+    last_field = last_ans.field_name if last_ans else "chief_complaint"
+    last_text = last_ans.answer_text if last_ans else ""
+
+    return DialogueManager.process_turn(
+        session_id=session.id,
+        current_field=last_field,
+        answer_text=last_text,
+        language=language,
+        prior_answers=answers,
+        db=db
+    )
 
 @router.post("/answer")
 def save_answer(payload: AnswerSubmitSchema, db: Session = Depends(get_db)):
     """
     Save an individual question answer in the interview session.
+    Triggers deterministic rule-based red flag detection and returns adaptive nextQuestion.
     """
     session = db.query(InterviewSession).filter(InterviewSession.id == payload.sessionId).first()
     if not session:
         raise HTTPException(status_code=404, detail="Interview session not found")
 
+    q_source = payload.questionSource or "rule-based"
     answer = InterviewAnswer(
         session_id=session.id,
         field_name=payload.fieldName,
         question_text=payload.questionText,
+        question_source=q_source,
         answer_text=payload.answerText,
         input_mode=payload.inputMode,
         source_tag="patient-reported"
@@ -60,11 +94,30 @@ def save_answer(payload: AnswerSubmitSchema, db: Session = Depends(get_db)):
     db.add(answer)
     db.commit()
 
+    # Collect prior answers
+    prior_answers = {a.field_name: a.answer_text for a in session.answers}
+
+    # Process adaptive dialogue turn with SOCRATES skipping and red-flag check
+    turn_res = DialogueManager.process_turn(
+        session_id=session.id,
+        current_field=payload.fieldName,
+        answer_text=payload.answerText,
+        language=payload.language or session.language or "en",
+        prior_answers=prior_answers,
+        db=db
+    )
+
     return {
         "success": True,
         "answerId": answer.id,
         "fieldName": answer.field_name,
-        "sourceTag": answer.source_tag
+        "questionSource": answer.question_source,
+        "sourceTag": answer.source_tag,
+        "redFlags": turn_res.get("redFlags", []),
+        "extracted": turn_res.get("extracted", {}),
+        "nextQuestion": turn_res.get("nextQuestion"),
+        "isComplete": turn_res.get("isComplete", False),
+        "badge": turn_res.get("badge", "Standard Question")
     }
 
 @router.post("/submit/{sessionId}")

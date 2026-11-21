@@ -1,19 +1,48 @@
 // VoiceInterviewPage.jsx — Screen 3: AI Voice Interview (Case-Taking)
 // Theme 3: Patient Friendly, Concentric Mic Orb, Waveform, SOCRATES questions, Bilingual Web Speech API
+// Rule 1: First question is always "What health problem are you facing today? Please describe it in your own words."
+// Rule 3: Deterministic bilingual red flag triage on every turn
+// Rule 5: Guarded LLM follow-up or SOCRATES rule-based fallback
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Mic, MicOff, ArrowLeft, ArrowRight, Pause, Play, Send,
-  Volume2, AlertTriangle, CheckCircle2, MessageSquare, ChevronLeft, ChevronRight
+  Volume2, AlertTriangle, CheckCircle2, MessageSquare, ChevronLeft, ChevronRight, Sparkles
 } from 'lucide-react';
 import AppLayout from '../layouts/AppLayout';
 import StepperBar from '../components/StepperBar';
 import RedFlagBanner from '../components/RedFlagBanner';
 import useAppStore from '../store/appStore';
-import { DIALOGUE_STEPS, INITIAL_QUESTIONS } from '../data/dialogueFlow';
+import { DIALOGUE_STEPS } from '../data/dialogueFlow';
 import { checkRedFlags } from '../data/redFlagRules';
 import { sessionApi } from '../services/api';
+
+const DEFAULT_FIRST_QUESTION = {
+  id: 'chief_complaint',
+  step: 'symptoms',
+  field: 'chief_complaint',
+  questionEn: 'What health problem are you facing today? Please describe it in your own words.',
+  questionHi: 'आज आप किस स्वास्थ्य समस्या का सामना कर रहे हैं? कृपया इसे अपने शब्दों में बताएं।',
+  questionSource: 'rule-based',
+  badge: 'AI follow-up off – using standard questions',
+  exampleChips: [
+    { en: 'I have a headache since 2 days and fever', hi: 'मुझे 2 दिन से सिरदर्द और बुखार है' },
+    { en: 'I have chest discomfort since morning', hi: 'मुझे आज सुबह से छाती में भारीपन है' },
+    { en: 'Stomach pain and vomiting since yesterday', hi: 'कल से पेट दर्द और उल्टी हो रही है' },
+    { en: 'Severe cough and sore throat for 3 days', hi: '3 दिनों से तेज खांसी और गले में खराश है' }
+  ],
+  touchOptions: [
+    { value: 'Headache', labelEn: 'Headache', labelHi: 'सिरदर्द' },
+    { value: 'Fever', labelEn: 'Fever & Chills', labelHi: 'बुखार और ठंड' },
+    { value: 'Cough', labelEn: 'Cough & Cold', labelHi: 'खांसी और जुकाम' },
+    { value: 'Chest Discomfort', labelEn: 'Chest Discomfort', labelHi: 'छाती में दर्द' },
+    { value: 'Stomach Pain', labelEn: 'Stomach / Abdominal Pain', labelHi: 'पेट दर्द' },
+    { value: 'Joint Pain', labelEn: 'Joint & Body Pain', labelHi: 'जोड़ों व बदन दर्द' },
+    { value: 'Breathlessness', labelEn: 'Breathlessness', labelHi: 'सांस फूलना' },
+    { value: 'Nausea / Vomiting', labelEn: 'Nausea & Vomiting', labelHi: 'उल्टी व जी मिचलाना' }
+  ]
+};
 
 export default function VoiceInterviewPage() {
   const { i18n } = useTranslation();
@@ -23,9 +52,20 @@ export default function VoiceInterviewPage() {
   const { user, interview, saveAnswer, addConversationTurn, addRedFlag } = useAppStore();
 
   const [sessionId, setSessionId] = useState(interview.sessionId || null);
-  const [currentIndex, setCurrentIndex] = useState(interview.currentQuestionIndex || 0);
+  const [currentQuestion, setCurrentQuestion] = useState(DEFAULT_FIRST_QUESTION);
+  const [questionCount, setQuestionCount] = useState(1);
+  const estimatedTotal = 7;
 
-  // Reload session from database on mount
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [manualText, setManualText] = useState('');
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const [speechError, setSpeechError] = useState('');
+  const [speakingBot, setSpeakingBot] = useState(false);
+
+  const recognitionRef = useRef(null);
+
+  // Initialize session and restore state from backend
   useEffect(() => {
     if (user?.id) {
       sessionApi.getLatestSession(user.id).then((sess) => {
@@ -35,46 +75,33 @@ export default function VoiceInterviewPage() {
             sess.answers.forEach((ans) => {
               saveAnswer(ans.field_name, ans.answer_text);
             });
-            const count = sess.answers.length;
-            if (count > 0 && count < INITIAL_QUESTIONS.length) {
-              setCurrentIndex(count);
+            if (sess.answers.length > 0) {
+              setQuestionCount(sess.answers.length + 1);
+              // Fetch next adaptive question from backend
+              sessionApi.getNextQuestion(sess.id, isHi ? 'hi' : 'en').then((qData) => {
+                if (qData?.nextQuestion) {
+                  setCurrentQuestion(qData.nextQuestion);
+                }
+              }).catch(() => {});
             }
           }
         } else {
-          sessionApi.startSession(user.id, isHi ? 'hi' : 'en').then((s) => {
-            if (s?.id) setSessionId(s.id);
+          sessionApi.startSession(user.id, isHi ? 'hi' : 'en').then((res) => {
+            if (res?.sessionId) {
+              setSessionId(res.sessionId);
+              if (res.firstQuestion) {
+                setCurrentQuestion(res.firstQuestion);
+              }
+            }
           }).catch(() => {});
         }
       }).catch(() => {});
     }
-  }, [user?.id]);
-  const [isListening, setIsListening] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [manualText, setManualText] = useState('');
-  const [speechSupported, setSpeechSupported] = useState(true);
-  const [speechError, setSpeechError] = useState('');
-  const [speakingBot, setSpeakingBot] = useState(false);
+  }, [user?.id, isHi]);
 
-  const recognitionRef = useRef(null);
-  const currentQuestion = INITIAL_QUESTIONS[currentIndex] || INITIAL_QUESTIONS[0];
-  const totalQuestions = INITIAL_QUESTIONS.length;
-
-  // Map step to StepperBar index: symptoms(0), history(1), lifestyle(2), review(3)
+  // Stepper mapping
   const stepMap = { symptoms: 0, history: 1, lifestyle: 2, review: 3 };
-  const currentStepIndex = stepMap[currentQuestion.step] ?? 0;
-
-  // Step label for progress bar
-  const stepLabels = [
-    { en: 'Chief Complaint', hi: 'मुख्य शिकायत' },
-    { en: 'History of Present Illness', hi: 'वर्तमान रोग इतिहास' },
-    { en: 'Past Medical History', hi: 'पुराना इतिहास' },
-    { en: 'Lifestyle & Social', hi: 'जीवनशैली' },
-    { en: 'Medications & Allergies', hi: 'दवाएं और एलर्जी' },
-    { en: 'Family History', hi: 'पारिवारिक इतिहास' },
-    { en: 'Review', hi: 'समीक्षा' },
-  ];
-  const currentStepLabel = stepLabels[Math.min(currentIndex, stepLabels.length - 1)];
+  const currentStepIndex = stepMap[currentQuestion?.step || 'symptoms'] ?? 0;
 
   // Initialize Web Speech API
   useEffect(() => {
@@ -160,77 +187,113 @@ export default function VoiceInterviewPage() {
     const value = answerValue || manualText || transcript;
     if (!value || !value.trim()) return;
 
-    // Check for deterministic red flags
-    const detected = checkRedFlags(value);
-    if (detected.length > 0) {
-      detected.forEach((flag) => addRedFlag(flag));
+    const trimmed = value.trim();
+
+    // 1. Client-side deterministic red flag check
+    const localFlags = checkRedFlags(trimmed);
+    if (localFlags.length > 0) {
+      localFlags.forEach((flag) => addRedFlag(flag));
     }
 
-    // Save answer in store
-    saveAnswer(currentQuestion.field, value.trim());
+    // 2. Save in app store
+    saveAnswer(currentQuestion.field || 'chief_complaint', trimmed);
 
-    // Record turn in conversation
+    // 3. Record conversation turn
     addConversationTurn({
       id: `turn-${Date.now()}`,
       speaker: 'patient',
-      text: value.trim(),
+      text: trimmed,
       mode: transcript ? 'voice' : 'touch',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
 
-    // Save answer directly to backend database
+    // 4. Save to backend database & get adaptive next question
     let activeSessionId = sessionId;
     if (!activeSessionId && user?.id) {
       try {
         const newSess = await sessionApi.startSession(user.id, isHi ? 'hi' : 'en');
-        activeSessionId = newSess?.id;
+        activeSessionId = newSess?.sessionId;
         setSessionId(activeSessionId);
       } catch (e) {
         console.error(e);
       }
     }
-    if (activeSessionId) {
-      sessionApi.saveAnswer(
-        activeSessionId,
-        currentQuestion.field,
-        value.trim(),
-        transcript ? 'voice' : 'touch'
-      ).catch(console.error);
-    }
 
     setManualText('');
     setTranscript('');
 
-    // Advance to next question or review
-    if (currentIndex < INITIAL_QUESTIONS.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      if (activeSessionId) {
-        sessionApi.submitSession(activeSessionId).catch(console.error);
+    if (activeSessionId) {
+      try {
+        const qText = isHi ? (currentQuestion.questionHi || currentQuestion.questionText) : (currentQuestion.questionEn || currentQuestion.questionText);
+        const res = await sessionApi.saveAnswer(
+          activeSessionId,
+          currentQuestion.field || 'chief_complaint',
+          trimmed,
+          transcript ? 'voice' : 'touch',
+          qText,
+          currentQuestion.questionSource || 'rule-based',
+          isHi ? 'hi' : 'en'
+        );
+
+        // Record backend red flags if any
+        if (res?.redFlags && Array.isArray(res.redFlags)) {
+          res.redFlags.forEach((rf) => {
+            addRedFlag({
+              category: rf.category,
+              severity: rf.severity,
+              keywordMatched: rf.keyword,
+              messageEn: rf.message_en || rf.message,
+              messageHi: rf.message_hi || rf.message,
+              actionEn: rf.action_en || rf.action,
+              actionHi: rf.action_hi || rf.action
+            });
+          });
+        }
+
+        // Advance to next question or complete
+        if (res?.isComplete || !res?.nextQuestion) {
+          await sessionApi.submitSession(activeSessionId);
+          navigate('/summary');
+        } else if (res?.nextQuestion) {
+          setCurrentQuestion(res.nextQuestion);
+          setQuestionCount((c) => c + 1);
+          const nextPrompt = isHi
+            ? (res.nextQuestion.questionHi || res.nextQuestion.questionText)
+            : (res.nextQuestion.questionEn || res.nextQuestion.questionText);
+          speakQuestion(nextPrompt);
+        }
+      } catch (err) {
+        console.error('Save answer error:', err);
+        navigate('/summary');
       }
+    } else {
       navigate('/summary');
     }
   };
 
+  const displayedQuestionText = isHi
+    ? (currentQuestion.questionHi || currentQuestion.questionText)
+    : (currentQuestion.questionEn || currentQuestion.questionText);
+
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto space-y-5">
-        {/* Progress bar: Step X of Y */}
+        {/* Progress bar */}
         <div className="bg-white rounded-2xl p-4 border border-[#E2EFE7] shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-gray-700">
               {isHi
-                ? `चरण ${currentIndex + 1} / ${totalQuestions}: ${currentStepLabel.hi}`
-                : `Step ${currentIndex + 1} of ${totalQuestions}: ${currentStepLabel.en}`}
+                ? `प्रश्न ${questionCount} (लक्षण एवं स्वास्थ्य इतिहास)`
+                : `Question ${questionCount} (Symptoms & Clinical Intake)`}
             </span>
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-mint-100 text-brand border border-mint-200">
-              {Math.round(((currentIndex) / totalQuestions) * 100)}% {isHi ? 'पूर्ण' : 'done'}
+              {Math.min(95, Math.round((questionCount / estimatedTotal) * 100))}% {isHi ? 'पूर्ण' : 'done'}
             </span>
           </div>
           <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
             <div
               className="h-full bg-brand rounded-full transition-all duration-500"
-              style={{ width: `${((currentIndex) / totalQuestions) * 100}%` }}
+              style={{ width: `${Math.min(100, (questionCount / estimatedTotal) * 100)}%` }}
             />
           </div>
         </div>
@@ -238,18 +301,15 @@ export default function VoiceInterviewPage() {
         {/* Navigation Header */}
         <div className="flex items-center justify-between">
           <button
-            onClick={() => {
-              if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
-              else navigate('/dashboard');
-            }}
+            onClick={() => navigate('/dashboard')}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:text-brand hover:border-brand transition-colors min-h-[44px]"
           >
             <ChevronLeft className="w-4 h-4" />
-            <span>{isHi ? 'वापस' : 'Back'}</span>
+            <span>{isHi ? 'डैशबोर्ड' : 'Dashboard'}</span>
           </button>
 
           <span className="text-xs font-semibold px-3 py-1 rounded-full bg-mint-100 text-brand border border-mint-200">
-            {isHi ? `प्रश्न ${currentIndex + 1} / ${INITIAL_QUESTIONS.length}` : `Question ${currentIndex + 1} of ${INITIAL_QUESTIONS.length}`}
+            {isHi ? `प्रश्न संख्या: ${questionCount}` : `Question #${questionCount}`}
           </span>
 
           <button
@@ -257,14 +317,14 @@ export default function VoiceInterviewPage() {
             disabled={!manualText.trim() && !transcript.trim()}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand text-white text-sm font-bold shadow-button-green hover:bg-brand-dark transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
           >
-            <span>{currentIndex < INITIAL_QUESTIONS.length - 1 ? (isHi ? 'अगला' : 'Next') : (isHi ? 'सबमिट' : 'Submit')}</span>
+            <span>{isHi ? 'आगे बढ़ें' : 'Next'}</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
         {/* Stepper Bar (Symptoms -> History -> Lifestyle -> Review) */}
         <StepperBar
-          steps={DIALOGUE_STEPS.map(s => isHi ? s.labelHi : s.labelEn)}
+          steps={DIALOGUE_STEPS.map((s) => (isHi ? s.labelHi : s.labelEn))}
           currentStep={currentStepIndex}
         />
 
@@ -275,38 +335,54 @@ export default function VoiceInterviewPage() {
               <RedFlagBanner
                 key={idx}
                 severity={flag.severity}
-                message={isHi ? flag.messageHi : flag.messageEn}
+                message={isHi ? (flag.messageHi || flag.alertMessage) : (flag.messageEn || flag.alertMessage)}
                 action={isHi ? flag.actionHi : flag.actionEn}
               />
             ))}
           </div>
         )}
 
-        {/* Central Stage: Large Question Card with Concentric Mic Rings */}
-        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-[#E2EFE7] shadow-card text-center space-y-6">
+        {/* Central Stage: Question Card */}
+        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-[#E2EFE7] shadow-card text-center space-y-5">
+          {/* Badge: AI-generated vs Rule-based Standard Question */}
+          <div className="flex items-center justify-center">
+            {currentQuestion.questionSource === 'llm-generated' ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-700 border border-purple-200 shadow-sm animate-pulse">
+                <Sparkles className="w-3.5 h-3.5" />
+                AI-generated question
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-mint-100 text-brand border border-mint-200">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                AI follow-up off – using standard questions
+              </span>
+            )}
+          </div>
+
           {/* Concentric Mic Orb Animation */}
-          <div className="relative flex items-center justify-center py-4">
+          <div className="relative flex items-center justify-center py-2">
             {/* Outer pulsating ring */}
             <div
-              className={`absolute w-36 h-36 rounded-full transition-all duration-700 ${isListening
-                  ? 'bg-brand/10 animate-ping scale-125'
-                  : 'bg-mint-100/60'
-                }`}
+              className={`absolute w-36 h-36 rounded-full transition-all duration-700 ${
+                isListening ? 'bg-brand/10 animate-ping scale-125' : 'bg-mint-100/60'
+              }`}
             ></div>
 
             {/* Middle mint ring */}
             <div
-              className={`absolute w-28 h-28 rounded-full transition-all duration-300 ${isListening ? 'bg-mint-200 scale-110' : 'bg-mint-100'
-                }`}
+              className={`absolute w-28 h-28 rounded-full transition-all duration-300 ${
+                isListening ? 'bg-mint-200 scale-110' : 'bg-mint-100'
+              }`}
             ></div>
 
-            {/* Core Circular Mic Button — animated ring when active */}
+            {/* Core Circular Mic Button */}
             <button
               onClick={toggleListening}
-              className={`relative z-10 w-20 h-20 rounded-full flex items-center justify-center text-white transition-all transform shadow-button-green ${isListening
+              className={`relative z-10 w-20 h-20 rounded-full flex items-center justify-center text-white transition-all transform shadow-button-green ${
+                isListening
                   ? 'bg-emerald-600 scale-105 ring-4 ring-emerald-300 ring-offset-2 animate-pulse'
                   : 'bg-brand hover:bg-brand-dark hover:scale-105'
-                }`}
+              }`}
               title={isListening ? 'Stop listening' : 'Start voice input'}
             >
               {isListening ? <Mic className="w-9 h-9" /> : <Mic className="w-8 h-8" />}
@@ -319,8 +395,9 @@ export default function VoiceInterviewPage() {
               <span
                 key={i}
                 style={{ height: isListening ? `${h}%` : '15%' }}
-                className={`w-1 rounded-full transition-all duration-150 ${isListening ? 'bg-brand' : 'bg-mint-200'
-                  }`}
+                className={`w-1 rounded-full transition-all duration-150 ${
+                  isListening ? 'bg-brand' : 'bg-mint-200'
+                }`}
               ></span>
             ))}
           </div>
@@ -339,13 +416,16 @@ export default function VoiceInterviewPage() {
             )}
           </div>
 
-          {/* Main Question Typography — min 16px */}
+          {/* Main Question Typography */}
           <div className="max-w-2xl mx-auto space-y-2">
-            <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight leading-snug" style={{ fontSize: 'clamp(1rem, 2.5vw, 1.75rem)' }}>
-              {isHi ? currentQuestion.questionHi : currentQuestion.questionEn}
+            <h2
+              className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight leading-snug"
+              style={{ fontSize: 'clamp(1rem, 2.5vw, 1.75rem)' }}
+            >
+              {displayedQuestionText}
             </h2>
             <button
-              onClick={() => speakQuestion(isHi ? currentQuestion.questionHi : currentQuestion.questionEn)}
+              onClick={() => speakQuestion(displayedQuestionText)}
               className="inline-flex items-center gap-1.5 text-xs text-brand hover:underline font-medium pt-1"
             >
               <Volume2 className="w-3.5 h-3.5" />
@@ -390,7 +470,7 @@ export default function VoiceInterviewPage() {
               <span className="text-xs text-gray-400 font-medium">
                 {isHi ? 'या सीधे टच करके चुनें:' : 'Or tap to select answer:'}
               </span>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {currentQuestion.touchOptions.map((opt, idx) => {
                   const label = isHi ? opt.labelHi : opt.labelEn;
                   const isSelected = manualText === opt.value || manualText === label;
@@ -401,10 +481,11 @@ export default function VoiceInterviewPage() {
                         setManualText(label);
                         handleSubmitAnswer(label);
                       }}
-                      className={`p-3 rounded-xl text-xs font-semibold border transition-all text-left truncate min-h-[44px] ${isSelected
+                      className={`p-3 rounded-xl text-xs font-semibold border transition-all text-left truncate min-h-[44px] ${
+                        isSelected
                           ? 'bg-brand text-white border-brand'
                           : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
-                        }`}
+                      }`}
                     >
                       {label}
                     </button>
@@ -443,7 +524,6 @@ export default function VoiceInterviewPage() {
           </h4>
 
           {interview.conversationHistory.length === 0 ? (
-            /* Friendly empty state */
             <div className="text-center py-6 space-y-2">
               <div className="text-3xl">💬</div>
               <p className="text-xs text-gray-400 font-medium">
@@ -457,46 +537,21 @@ export default function VoiceInterviewPage() {
               {interview.conversationHistory.map((turn, idx) => (
                 <div
                   key={idx}
-                  className={`p-2.5 rounded-xl flex items-start gap-2 ${turn.speaker === 'patient'
-                      ? 'bg-mint-50 ml-6 text-gray-800 border border-mint-200'
-                      : 'bg-gray-50 mr-6 text-gray-600 border border-gray-100'
-                    }`}
+                  className={`p-2.5 rounded-xl flex items-start gap-2 ${
+                    turn.speaker === 'patient'
+                      ? 'bg-mint-50/70 border border-mint-200 text-gray-800'
+                      : 'bg-gray-50 border border-gray-100 text-gray-700'
+                  }`}
                 >
-                  <span className="font-bold text-brand uppercase text-[10px] shrink-0">
-                    {turn.speaker === 'patient' ? (isHi ? 'मरीज:' : 'You:') : (isHi ? 'रोगमित्र:' : 'RogMitra:')}
+                  <span className="font-bold text-[10px] uppercase text-brand min-w-[50px]">
+                    {turn.speaker === 'patient' ? 'Patient:' : 'RogMitra:'}
                   </span>
-                  <span className="flex-1">{turn.text || (isHi ? turn.textHi : turn.textEn)}</span>
-                  {turn.mode && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white text-gray-400 font-mono">
-                      {turn.mode}
-                    </span>
-                  )}
+                  <span className="flex-1">{turn.text}</span>
+                  <span className="text-[10px] text-gray-400">{turn.timestamp}</span>
                 </div>
               ))}
             </div>
           )}
-        </div>
-
-        {/* Bottom nav bar */}
-        <div className="flex gap-3">
-          <button
-            onClick={() => {
-              if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
-              else navigate('/dashboard');
-            }}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:text-brand hover:border-brand transition-colors min-h-[48px]"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            {isHi ? 'वापस जाएं' : 'Back'}
-          </button>
-          <button
-            onClick={() => handleSubmitAnswer()}
-            disabled={!manualText.trim() && !transcript.trim()}
-            className="flex-2 flex items-center justify-center gap-2 px-8 py-3 rounded-2xl bg-brand hover:bg-brand-dark text-white text-sm font-bold shadow-button-green transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[48px]"
-          >
-            {currentIndex < INITIAL_QUESTIONS.length - 1 ? (isHi ? 'अगला प्रश्न' : 'Next Question') : (isHi ? 'सारांश देखें' : 'View Summary')}
-            <ArrowRight className="w-4 h-4" />
-          </button>
         </div>
       </div>
     </AppLayout>

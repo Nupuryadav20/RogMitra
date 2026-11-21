@@ -15,7 +15,9 @@ RED_FLAG_DEFINITIONS = [
         ],
         "patterns_hi": [
             r"(छाती|सीने|दिल)[^\.\,\!\?]{0,25}(दर्द|जकड़न|दबाव)",
-            r"(बाएं\s+हाथ\s+में\s+दर्द)"
+            r"(बाएं\s+हाथ\s+में\s+दर्द)",
+            r"\b(seene|sine|chhati|chaati)\s*(mein|me)\s*(tez\s*)?(dard|jakdan|dabav)\b",
+            r"\b(left\s*arm\s*pain)\b"
         ],
         "message_en": "Severe / Acute Chest Pain or Pressure detected. Potential cardiac emergency.",
         "message_hi": "सीने में तेज दर्द या दबाव का पता चला है। यह आपातकालीन स्थिति हो सकती है।",
@@ -106,12 +108,12 @@ def is_negated(full_text: str, match_start: int, match_end: int) -> bool:
     prefix = full_text[max(0, match_start - 35):match_start].lower()
     suffix = full_text[match_end:min(len(full_text), match_end + 35)].lower()
 
-    # English negations before: "no chest pain", "denies shortness of breath", "without bleeding"
-    if re.search(r"\b(no|not|never|denies|denied|without|negative for|rules? out)\s*$", prefix):
+    # English and Roman Hindi negations before: "no chest pain", "koi dard nahi"
+    if re.search(r"\b(no|not|never|denies|denied|without|negative for|rules? out|koi)\s*$", prefix):
         return True
 
-    # Hindi negations after: "छाती में दर्द नहीं है", "सांस फूलने की कोई शिकायत नहीं"
-    if re.search(r"^\s*(नहीं है|नहीं|ना|नहीं हुआ|की कोई शिकायत नहीं|नहीं था)", suffix):
+    # Hindi negations after: "छाती में दर्द नहीं है", "saans lene me taklif nahi hai"
+    if re.search(r"^\s*(नहीं है|नहीं|ना|नहीं हुआ|की कोई शिकायत नहीं|नहीं था|nahi\s*hai|nahi|nhi)", suffix, re.IGNORECASE):
         return True
 
     return False
@@ -153,7 +155,7 @@ def scan_for_red_flags(text: str) -> List[Dict[str, Any]]:
 
         # 2. Hindi patterns
         for pattern in defn["patterns_hi"]:
-            m = re.search(pattern, normalized)
+            m = re.search(pattern, normalized, re.IGNORECASE)
             if m:
                 if not is_negated(normalized, m.start(), m.end()):
                     triggered_alerts.append({
