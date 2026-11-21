@@ -1,27 +1,30 @@
 # schemas/auth.py — Pydantic models for authentication and user profiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
 
 class RequestOtpSchema(BaseModel):
-    phone: str = Field(..., pattern=r'^\+?[0-9]{10,14}$')
+    phone: Optional[str] = ""
 
 class VerifyOtpSchema(BaseModel):
-    phone: str
-    otp: str
+    phone: Optional[str] = ""
+    otp: Optional[str] = ""
+    name: Optional[str] = None
+    role: Optional[str] = "patient"
 
 class LoginDoctorSchema(BaseModel):
-    email: str
-    password: str
+    email: Optional[str] = ""
+    password: Optional[str] = ""
+    name: Optional[str] = None
 
 class MockAbhaSchema(BaseModel):
-    abhaId: str
+    abhaId: Optional[str] = ""
+    name: Optional[str] = None
 
 class RegisterPatientSchema(BaseModel):
     fullName: str
     phone: str
-    age: int
-    gender: str
+    age: int = 28
+    gender: str = "Other"
     abhaId: Optional[str] = None
 
 class TokenResponse(BaseModel):

@@ -134,6 +134,48 @@ def delete_temporary_session(sessionId: str, db: Session = Depends(get_db)):
         "message": "Temporary session data scrubbed successfully under DPDP Act privacy rules."
     }
 
+@router.get("/patient/{patientId}/latest")
+def get_latest_patient_session(patientId: str, db: Session = Depends(get_db)):
+    """
+    Get the latest session ID and answers for a patient (supports frontend reload after refresh).
+    """
+    session = (
+        db.query(InterviewSession)
+        .filter(InterviewSession.patient_id == patientId)
+        .order_by(InterviewSession.started_at.desc())
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="No session found for this patient")
+
+    return {
+        "sessionId": session.id,
+        "patientId": session.patient_id,
+        "status": session.status,
+        "startedAt": session.started_at.isoformat(),
+        "answers": [
+            {
+                "id": a.id,
+                "field": a.field_name,
+                "answer": a.answer_text,
+                "mode": a.input_mode,
+                "sourceTag": a.source_tag
+            }
+            for a in session.answers
+        ],
+        "redFlags": [
+            {
+                "id": rf.id,
+                "category": rf.category,
+                "severity": rf.severity,
+                "keyword": rf.keyword_matched,
+                "message": rf.alert_message
+            }
+            for rf in session.red_flags
+        ]
+    }
+
+
 @router.get("/{sessionId}")
 def get_session(sessionId: str, db: Session = Depends(get_db)):
     """

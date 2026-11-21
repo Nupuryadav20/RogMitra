@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Mic, MicOff, ArrowLeft, ArrowRight, Pause, Play, Send,
-  Volume2, AlertTriangle, CheckCircle2, MessageSquare
+  Volume2, AlertTriangle, CheckCircle2, MessageSquare, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import AppLayout from '../layouts/AppLayout';
 import StepperBar from '../components/StepperBar';
@@ -32,10 +32,23 @@ export default function VoiceInterviewPage() {
 
   const recognitionRef = useRef(null);
   const currentQuestion = INITIAL_QUESTIONS[currentIndex] || INITIAL_QUESTIONS[0];
+  const totalQuestions = INITIAL_QUESTIONS.length;
 
   // Map step to StepperBar index: symptoms(0), history(1), lifestyle(2), review(3)
   const stepMap = { symptoms: 0, history: 1, lifestyle: 2, review: 3 };
   const currentStepIndex = stepMap[currentQuestion.step] ?? 0;
+
+  // Step label for progress bar
+  const stepLabels = [
+    { en: 'Chief Complaint', hi: 'मुख्य शिकायत' },
+    { en: 'History of Present Illness', hi: 'वर्तमान रोग इतिहास' },
+    { en: 'Past Medical History', hi: 'पुराना इतिहास' },
+    { en: 'Lifestyle & Social', hi: 'जीवनशैली' },
+    { en: 'Medications & Allergies', hi: 'दवाएं और एलर्जी' },
+    { en: 'Family History', hi: 'पारिवारिक इतिहास' },
+    { en: 'Review', hi: 'समीक्षा' },
+  ];
+  const currentStepLabel = stepLabels[Math.min(currentIndex, stepLabels.length - 1)];
 
   // Initialize Web Speech API
   useEffect(() => {
@@ -97,12 +110,6 @@ export default function VoiceInterviewPage() {
     window.speechSynthesis.speak(utterance);
   };
 
-  // Trigger TTS when question changes
-  useEffect(() => {
-    const questionText = isHi ? currentQuestion.questionHi : currentQuestion.questionEn;
-    // speakQuestion(questionText); // Optional: can be manually triggered by volume button
-  }, [currentIndex, isHi]);
-
   const toggleListening = () => {
     if (!speechSupported) return;
     if (isListening) {
@@ -158,23 +165,52 @@ export default function VoiceInterviewPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Navigation & Header */}
+      <div className="max-w-4xl mx-auto space-y-5">
+        {/* Progress bar: Step X of Y */}
+        <div className="bg-white rounded-2xl p-4 border border-[#E2EFE7] shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-gray-700">
+              {isHi
+                ? `चरण ${currentIndex + 1} / ${totalQuestions}: ${currentStepLabel.hi}`
+                : `Step ${currentIndex + 1} of ${totalQuestions}: ${currentStepLabel.en}`}
+            </span>
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-mint-100 text-brand border border-mint-200">
+              {Math.round(((currentIndex) / totalQuestions) * 100)}% {isHi ? 'पूर्ण' : 'done'}
+            </span>
+          </div>
+          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-brand rounded-full transition-all duration-500"
+              style={{ width: `${((currentIndex) / totalQuestions) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Navigation Header */}
         <div className="flex items-center justify-between">
           <button
             onClick={() => {
               if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
               else navigate('/dashboard');
             }}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-brand transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:text-brand hover:border-brand transition-colors min-h-[44px]"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span>{isHi ? 'वापस जाएं' : 'Back'}</span>
+            <ChevronLeft className="w-4 h-4" />
+            <span>{isHi ? 'वापस' : 'Back'}</span>
           </button>
 
           <span className="text-xs font-semibold px-3 py-1 rounded-full bg-mint-100 text-brand border border-mint-200">
             {isHi ? `प्रश्न ${currentIndex + 1} / ${INITIAL_QUESTIONS.length}` : `Question ${currentIndex + 1} of ${INITIAL_QUESTIONS.length}`}
           </span>
+
+          <button
+            onClick={() => handleSubmitAnswer()}
+            disabled={!manualText.trim() && !transcript.trim()}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand text-white text-sm font-bold shadow-button-green hover:bg-brand-dark transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+          >
+            <span>{currentIndex < INITIAL_QUESTIONS.length - 1 ? (isHi ? 'अगला' : 'Next') : (isHi ? 'सबमिट' : 'Submit')}</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Stepper Bar (Symptoms -> History -> Lifestyle -> Review) */}
@@ -203,28 +239,25 @@ export default function VoiceInterviewPage() {
           <div className="relative flex items-center justify-center py-4">
             {/* Outer pulsating ring */}
             <div
-              className={`absolute w-36 h-36 rounded-full transition-all duration-700 ${
-                isListening
+              className={`absolute w-36 h-36 rounded-full transition-all duration-700 ${isListening
                   ? 'bg-brand/10 animate-ping scale-125'
                   : 'bg-mint-100/60'
-              }`}
+                }`}
             ></div>
 
             {/* Middle mint ring */}
             <div
-              className={`absolute w-28 h-28 rounded-full transition-all duration-300 ${
-                isListening ? 'bg-mint-200 scale-110' : 'bg-mint-100'
-              }`}
+              className={`absolute w-28 h-28 rounded-full transition-all duration-300 ${isListening ? 'bg-mint-200 scale-110' : 'bg-mint-100'
+                }`}
             ></div>
 
-            {/* Core Circular Mic Button */}
+            {/* Core Circular Mic Button — animated ring when active */}
             <button
               onClick={toggleListening}
-              className={`relative z-10 w-20 h-20 rounded-full flex items-center justify-center text-white transition-all transform shadow-button-green ${
-                isListening
-                  ? 'bg-emerald-600 scale-105 ring-4 ring-emerald-300 animate-pulse'
-                  : 'bg-brand hover:bg-brand-dark'
-              }`}
+              className={`relative z-10 w-20 h-20 rounded-full flex items-center justify-center text-white transition-all transform shadow-button-green ${isListening
+                  ? 'bg-emerald-600 scale-105 ring-4 ring-emerald-300 ring-offset-2 animate-pulse'
+                  : 'bg-brand hover:bg-brand-dark hover:scale-105'
+                }`}
               title={isListening ? 'Stop listening' : 'Start voice input'}
             >
               {isListening ? <Mic className="w-9 h-9" /> : <Mic className="w-8 h-8" />}
@@ -237,9 +270,8 @@ export default function VoiceInterviewPage() {
               <span
                 key={i}
                 style={{ height: isListening ? `${h}%` : '15%' }}
-                className={`w-1 rounded-full transition-all duration-150 ${
-                  isListening ? 'bg-brand' : 'bg-mint-200'
-                }`}
+                className={`w-1 rounded-full transition-all duration-150 ${isListening ? 'bg-brand' : 'bg-mint-200'
+                  }`}
               ></span>
             ))}
           </div>
@@ -258,9 +290,9 @@ export default function VoiceInterviewPage() {
             )}
           </div>
 
-          {/* Main Question Typography */}
+          {/* Main Question Typography — min 16px */}
           <div className="max-w-2xl mx-auto space-y-2">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight leading-snug">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight leading-snug" style={{ fontSize: 'clamp(1rem, 2.5vw, 1.75rem)' }}>
               {isHi ? currentQuestion.questionHi : currentQuestion.questionEn}
             </h2>
             <button
@@ -303,7 +335,7 @@ export default function VoiceInterviewPage() {
             </div>
           )}
 
-          {/* Touch-Based Answer Options (Accessibility for Low-Voice / Noisy OPD) */}
+          {/* Touch-Based Answer Options */}
           {currentQuestion.touchOptions && (
             <div className="pt-4 border-t border-gray-100 max-w-2xl mx-auto space-y-2">
               <span className="text-xs text-gray-400 font-medium">
@@ -320,11 +352,10 @@ export default function VoiceInterviewPage() {
                         setManualText(label);
                         handleSubmitAnswer(label);
                       }}
-                      className={`p-2.5 rounded-xl text-xs font-semibold border transition-all text-left truncate ${
-                        isSelected
+                      className={`p-3 rounded-xl text-xs font-semibold border transition-all text-left truncate min-h-[44px] ${isSelected
                           ? 'bg-brand text-white border-brand'
                           : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
-                      }`}
+                        }`}
                     >
                       {label}
                     </button>
@@ -342,34 +373,45 @@ export default function VoiceInterviewPage() {
               onChange={(e) => setManualText(e.target.value)}
               placeholder={isHi ? 'अपनी प्रतिक्रिया यहां लिखें या सुधारें...' : 'Type or edit your response here...'}
               className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent text-sm bg-gray-50/50"
+              style={{ fontSize: '16px' }}
             />
             <button
               onClick={() => handleSubmitAnswer()}
               disabled={!manualText.trim() && !transcript.trim()}
-              className="px-5 py-3 rounded-xl bg-brand hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm shadow-button-green transition-all flex items-center gap-1.5"
+              className="px-5 py-3 rounded-xl bg-brand hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm shadow-button-green transition-all flex items-center gap-1.5 min-h-[48px]"
             >
-              <span>{isHi ? 'आगे बढ़ें' : 'Next'}</span>
+              <span>{isHi ? 'आगे' : 'Next'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Conversation Q&A History Log */}
-        {interview.conversationHistory.length > 0 && (
-          <div className="bg-white rounded-2xl p-5 border border-[#E2EFE7] shadow-sm space-y-3">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5 text-brand" />
-              <span>{isHi ? 'बातचीत का इतिहास (Conversation Log)' : 'Conversation Log'}</span>
-            </h4>
+        <div className="bg-white rounded-2xl p-5 border border-[#E2EFE7] shadow-sm space-y-3">
+          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+            <MessageSquare className="w-3.5 h-3.5 text-brand" />
+            <span>{isHi ? 'बातचीत का इतिहास (Conversation Log)' : 'Conversation Log'}</span>
+          </h4>
+
+          {interview.conversationHistory.length === 0 ? (
+            /* Friendly empty state */
+            <div className="text-center py-6 space-y-2">
+              <div className="text-3xl">💬</div>
+              <p className="text-xs text-gray-400 font-medium">
+                {isHi
+                  ? 'अभी तक कोई बातचीत दर्ज नहीं हुई। ऊपर माइक पर टैप करके शुरू करें!'
+                  : 'No conversation yet. Tap the microphone above to begin your interview!'}
+              </p>
+            </div>
+          ) : (
             <div className="space-y-2 max-h-48 overflow-y-auto pr-2 text-xs">
               {interview.conversationHistory.map((turn, idx) => (
                 <div
                   key={idx}
-                  className={`p-2.5 rounded-xl flex items-start gap-2 ${
-                    turn.speaker === 'patient'
+                  className={`p-2.5 rounded-xl flex items-start gap-2 ${turn.speaker === 'patient'
                       ? 'bg-mint-50 ml-6 text-gray-800 border border-mint-200'
                       : 'bg-gray-50 mr-6 text-gray-600 border border-gray-100'
-                  }`}
+                    }`}
                 >
                   <span className="font-bold text-brand uppercase text-[10px] shrink-0">
                     {turn.speaker === 'patient' ? (isHi ? 'मरीज:' : 'You:') : (isHi ? 'रोगमित्र:' : 'RogMitra:')}
@@ -383,8 +425,30 @@ export default function VoiceInterviewPage() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Bottom nav bar */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => {
+              if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+              else navigate('/dashboard');
+            }}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:text-brand hover:border-brand transition-colors min-h-[48px]"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {isHi ? 'वापस जाएं' : 'Back'}
+          </button>
+          <button
+            onClick={() => handleSubmitAnswer()}
+            disabled={!manualText.trim() && !transcript.trim()}
+            className="flex-2 flex items-center justify-center gap-2 px-8 py-3 rounded-2xl bg-brand hover:bg-brand-dark text-white text-sm font-bold shadow-button-green transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[48px]"
+          >
+            {currentIndex < INITIAL_QUESTIONS.length - 1 ? (isHi ? 'अगला प्रश्न' : 'Next Question') : (isHi ? 'सारांश देखें' : 'View Summary')}
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </AppLayout>
   );

@@ -26,55 +26,92 @@ apiClient.interceptors.request.use((config) => {
 
 // Authentication endpoints
 export const authApi = {
+  getConfig: async () => {
+    try {
+      const res = await apiClient.get('/auth/config');
+      return res.data;
+    } catch {
+      return { demo_login_open: true, demo_mode: true, demo_otp: '123456' };
+    }
+  },
+
   requestOtp: async (phone) => {
     try {
       const res = await apiClient.post('/auth/request-otp', { phone });
       return res.data;
     } catch {
-      // Demo fallback
       return {
         success: true,
-        message: 'Demo OTP sent (Use 123456)',
+        message: 'Demo mode: enter any OTP',
         demoOtp: '123456',
         _isFallback: true
       };
     }
   },
 
-  verifyOtp: async (phone, otp) => {
+  verifyOtp: async (phone, otp, name = '') => {
     try {
-      const res = await apiClient.post('/auth/verify-otp', { phone, otp });
-      return res.data;
+      const res = await apiClient.post('/auth/verify-otp', { phone, otp, name, role: 'patient' });
+      const data = res.data;
+      return {
+        token: data.access_token || data.token,
+        user: {
+          id: data.user_id || 'pat-1',
+          name: data.full_name || name || 'Demo Patient',
+          phone: data.phone || phone,
+          role: 'patient',
+          abhaId: data.abha_id
+        }
+      };
     } catch {
       return {
         token: 'demo-jwt-token-patient',
-        user: { id: 'pat-1', name: 'Ananya Verma', phone, role: 'patient' },
+        user: { id: 'pat-1', name: name || 'Demo Patient', phone, role: 'patient' },
         _isFallback: true
       };
     }
   },
 
-  loginDoctor: async (email, password) => {
+  loginDoctor: async (email, password, name = '') => {
     try {
-      const res = await apiClient.post('/auth/login-doctor', { email, password });
-      return res.data;
+      const res = await apiClient.post('/auth/login-doctor', { email, password, name });
+      const data = res.data;
+      return {
+        token: data.access_token || data.token,
+        user: {
+          id: data.user_id || 'doc-1',
+          name: data.full_name || name || 'Dr. Demo',
+          email: data.email || email,
+          role: 'doctor',
+          department: 'General Medicine'
+        }
+      };
     } catch {
       return {
         token: 'demo-jwt-token-doctor',
-        user: { id: 'doc-1', name: 'Dr. Sharma', email, role: 'doctor', department: 'General Medicine' },
+        user: { id: 'doc-1', name: name || 'Dr. Demo', email, role: 'doctor', department: 'General Medicine' },
         _isFallback: true
       };
     }
   },
 
-  mockAbhaAuth: async (abhaId) => {
+  mockAbhaAuth: async (abhaId, name = '') => {
     try {
-      const res = await apiClient.post('/auth/mock-abha', { abhaId });
-      return res.data;
+      const res = await apiClient.post('/auth/mock-abha', { abhaId, name });
+      const data = res.data;
+      return {
+        token: data.access_token || data.token,
+        user: {
+          id: data.user_id || 'pat-abha-1',
+          name: data.full_name || name || 'Demo Patient (ABHA)',
+          abhaId: data.abha_id || abhaId,
+          role: 'patient'
+        }
+      };
     } catch {
       return {
         token: 'demo-jwt-token-abha',
-        user: { id: 'pat-abha-1', name: 'Ananya Verma', abhaId, phone: '9876543210', role: 'patient' },
+        user: { id: 'pat-abha-1', name: name || 'Demo Patient (ABHA)', abhaId, phone: '9876543210', role: 'patient' },
         _isFallback: true
       };
     }

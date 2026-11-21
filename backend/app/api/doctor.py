@@ -59,7 +59,7 @@ def get_opd_queue(db: Session = Depends(get_db)):
                 "abhaId": "91-8765-4321-0987",
                 "redFlags": [
                     {"severity": "URGENT", "message": "Persistent headache (> 3 days)"},
-                    {"severity": "URGENT", "message": "Elevated ESR (28 mm/hr)"}
+                    {"severity": "URGENT", "message": "Elevated inflammatory markers detected"}
                 ]
             },
             {

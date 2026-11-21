@@ -15,10 +15,12 @@ import useAppStore from './store/appStore';
 
 // Protected Route for Patients
 function PatientRoute({ children }) {
-  const { user } = useAppStore();
-  // In demo mode, default allows access, but redirect if explicitly not logged in
-  if (user === null) {
+  const { user, role } = useAppStore();
+  if (!user) {
     return <Navigate to="/login" replace />;
+  }
+  if (role === 'doctor') {
+    return <Navigate to="/doctor" replace />;
   }
   return children;
 }
@@ -26,10 +28,12 @@ function PatientRoute({ children }) {
 // Protected Route for Doctors
 function DoctorRoute({ children }) {
   const { user, role } = useAppStore();
-  if (user === null) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
-  // Allow doctors or preview in demo mode
+  if (role !== 'doctor') {
+    return <Navigate to="/dashboard" replace />;
+  }
   return children;
 }
 

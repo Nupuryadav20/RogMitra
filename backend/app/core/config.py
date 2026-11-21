@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./rogmitra.db"
     DEMO_MODE: bool = True
     DEMO_OTP: str = "123456"
+    DEMO_LOGIN_OPEN: bool = True
 
     model_config = SettingsConfigDict(
         case_sensitive=True,

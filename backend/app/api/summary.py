@@ -79,7 +79,7 @@ def approve_summary(summaryId: str, payload: SummaryReviewSchema, db: Session = 
 
     if summary:
         summary.status = "approved"
-        summary.reviewed_by = "Dr. R. Sharma"
+        summary.reviewed_by = payload.doctorName or "Dr. R. Sharma"
         summary.reviewed_at = now
         if payload.doctorNotes:
             summary.doctor_notes = payload.doctorNotes
@@ -93,7 +93,7 @@ def approve_summary(summaryId: str, payload: SummaryReviewSchema, db: Session = 
     return {
         "success": True,
         "status": "approved",
-        "reviewedBy": "Dr. R. Sharma",
+        "reviewedBy": payload.doctorName or "Dr. R. Sharma",
         "reviewedAt": now.isoformat(),
         "message": "Clinical summary approved and saved into hospital consultation records."
     }
@@ -109,7 +109,7 @@ def reject_summary(summaryId: str, payload: SummaryRejectSchema, db: Session = D
     if summary:
         summary.status = "rejected"
         summary.rejection_reason = payload.reason
-        summary.reviewed_by = "Dr. R. Sharma"
+        summary.reviewed_by = payload.doctorName or "Dr. R. Sharma"
         summary.reviewed_at = now
         db.commit()
 

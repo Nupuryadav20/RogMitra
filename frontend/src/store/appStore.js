@@ -3,22 +3,28 @@
 
 import { create } from 'zustand';
 import { SYNTHETIC_PATIENTS } from '../data/syntheticPatients';
-import { SYNTHETIC_DOCUMENTS } from '../data/syntheticDocuments';
+
+// Helper: restore user from localStorage on app startup
+function restoreAuth() {
+  try {
+    const saved = localStorage.getItem('rogmitra_user');
+    const token = localStorage.getItem('rogmitra_token');
+    if (saved) {
+      const user = JSON.parse(saved);
+      return { user, role: user.role || 'patient', token: token || null, isAuthenticated: true };
+    }
+  } catch {}
+  return { user: null, role: 'patient', token: null, isAuthenticated: false };
+}
+
+const savedAuth = restoreAuth();
 
 export const useAppStore = create((set, get) => ({
-  // Authentication & Role
-  user: {
-    id: 'patient-demo-1',
-    name: 'Ananya Verma',
-    role: 'patient',
-    phone: '9876543210',
-    age: 28,
-    gender: 'Female',
-    abhaId: '91-8765-4321-0987'
-  },
-  role: 'patient', // 'patient' | 'doctor'
-  token: 'demo-jwt-token-rogmitra-btech',
-  isAuthenticated: true,
+  // Authentication & Role — restored from localStorage on startup
+  user: savedAuth.user,
+  role: savedAuth.role,
+  token: savedAuth.token,
+  isAuthenticated: savedAuth.isAuthenticated,
 
   // Consent (DPDP Act 2023)
   consented: localStorage.getItem('rogmitra_consented') === 'true',
@@ -29,50 +35,15 @@ export const useAppStore = create((set, get) => ({
 
   // Active Intake Interview Session
   interview: {
-    sessionId: 'session-live-001',
+    sessionId: null,
     currentQuestionIndex: 0,
-    answers: {
-      chief_complaint: 'Headache for 3 days, moderate intensity with mild fever',
-      onset_duration: '3 days, gradual onset',
-      character: 'Throbbing headache mainly frontal and temples',
-      severity: 'Moderate (5 out of 10)',
-      associated_symptoms: 'Mild fever and body pain, no vomiting, no neck stiffness',
-      past_medical: 'No known chronic illness',
-      medications: 'Took paracetamol 650mg SOS, not on regular medication',
-      allergies: 'No known drug allergies (NKDA)',
-      lifestyle: 'Vegetarian diet, non-smoker, sleep disturbed due to headache'
-    },
-    conversationHistory: [
-      {
-        id: 'msg-1',
-        speaker: 'bot',
-        textEn: 'Tell me about your current health problem. What brings you to the hospital today?',
-        textHi: 'कृपया अपनी वर्तमान स्वास्थ्य समस्या के बारे में बताएं।',
-        timestamp: '10:20 AM'
-      },
-      {
-        id: 'msg-2',
-        speaker: 'patient',
-        text: 'Headache for 3 days, moderate intensity with mild fever',
-        mode: 'voice',
-        timestamp: '10:21 AM'
-      }
-    ],
-    detectedRedFlags: [
-      {
-        id: 'PERSISTENT_HEADACHE_FEVER',
-        severity: 'URGENT',
-        messageEn: 'Persistent headache (>3 days) reported.',
-        messageHi: 'लगातार 3 दिनों से अधिक सिरदर्द दर्ज किया गया है।',
-        matchedKeyword: 'headache for 3 days'
-      }
-    ]
+    answers: {},
+    conversationHistory: [],
+    detectedRedFlags: []
   },
 
-  // Uploaded Documents & OCR entities
-  documents: [
-    ...SYNTHETIC_DOCUMENTS
-  ],
+  // Uploaded Documents & OCR entities (empty — only real uploaded documents)
+  documents: [],
 
   // Ayurvedic Assessment (AYUSH Mode)
   ayurveda: {
@@ -91,10 +62,8 @@ export const useAppStore = create((set, get) => ({
 
   // Doctor Dashboard Queue & Active Review
   doctorReview: {
-    activePatientId: 'pat-1',
-    queue: [
-      ...SYNTHETIC_PATIENTS
-    ],
+    activePatientId: SYNTHETIC_PATIENTS[0]?.id || null,
+    queue: [],
     summaryStatus: 'draft', // 'draft' | 'approved' | 'rejected'
     doctorNotes: '',
     editedFields: {},
@@ -104,17 +73,32 @@ export const useAppStore = create((set, get) => ({
   // Actions
   setRole: (newRole) => set({ role: newRole }),
   
-  login: (userData, role = 'patient') => set({
-    user: userData,
-    role: role,
-    isAuthenticated: true
-  }),
+  login: (userData, role = 'patient', token = null) => {
+    if (userData) {
+      localStorage.setItem('rogmitra_user', JSON.stringify({ ...userData, role }));
+    }
+    if (token) {
+      localStorage.setItem('rogmitra_token', token);
+    }
+    set({
+      user: userData,
+      role,
+      token: token || get().token,
+      isAuthenticated: true
+    });
+  },
 
-  logout: () => set({
-    user: null,
-    role: 'patient',
-    isAuthenticated: false
-  }),
+  logout: () => {
+    localStorage.removeItem('rogmitra_user');
+    localStorage.removeItem('rogmitra_token');
+    localStorage.removeItem('rogmitra_consented');
+    set({
+      user: null,
+      role: 'patient',
+      token: null,
+      isAuthenticated: false
+    });
+  },
 
   grantConsent: () => {
     const now = new Date().toISOString();

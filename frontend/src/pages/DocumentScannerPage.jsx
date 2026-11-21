@@ -182,7 +182,7 @@ export default function DocumentScannerPage() {
                     <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
                       Date
                     </span>
-                    <span className="font-bold text-gray-900 text-sm">{activeDoc.date || '12 Oct 2026'}</span>
+                    <span className="font-bold text-gray-900 text-sm">{activeDoc.date || 'Date not extracted'}</span>
                   </div>
                 </div>
 
@@ -203,10 +203,7 @@ export default function DocumentScannerPage() {
                   </div>
 
                   <div className="space-y-2">
-                    {(activeDoc.findings || [
-                      { test: 'Hemoglobin (Hb)', value: '11.2', unit: 'g/dL', status: 'Low', refRange: '12.0 - 15.5' },
-                      { test: 'ESR (Westergren)', value: '28', unit: 'mm/hr', status: 'High', refRange: '0 - 20' }
-                    ]).map((item, idx) => (
+                    {(activeDoc.findings || []).map((item, idx) => (
                       <div
                         key={idx}
                         className="p-2.5 rounded-xl bg-gray-50/70 border border-gray-100 flex items-center justify-between text-xs"

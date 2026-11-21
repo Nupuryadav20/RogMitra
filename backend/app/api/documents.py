@@ -76,16 +76,72 @@ async def upload_document(
         p = db.query(User).filter(User.role == "patient").first()
         resolved_patient_id = p.id if p else "demo-patient"
 
-    # Simulated deterministic rule-based OCR extractor (matching our synthetic test patterns)
-    raw_text = (
-        f"MEDICAL DOCUMENT OCR SCAN\n"
-        f"File: {file.filename}\n"
-        f"Date: 12-Oct-2026\n"
-        f"Complete Blood Count (CBC) & ESR\n"
-        f"Hemoglobin: 11.2 g/dL (LOW)\n"
-        f"ESR: 28 mm/hr (HIGH)\n"
-        f"WBC: 7,400 /mcL (NORMAL)\n"
-    )
+    # --- REAL regex-based text extraction from actual file content ---
+    # Step 1: Try to decode file content as UTF-8 text (works for text-based PDFs and plain text)
+    raw_text = ""
+    try:
+        raw_text = contents.decode("utf-8", errors="ignore")
+    except Exception:
+        raw_text = ""
+
+    # Step 2: If pytesseract is available and file is an image, use OCR
+    if not raw_text.strip() and ext in {".jpg", ".jpeg", ".png"}:
+        try:
+            import pytesseract
+            from PIL import Image
+            import io
+            img = Image.open(io.BytesIO(contents))
+            raw_text = pytesseract.image_to_string(img)
+        except Exception:
+            raw_text = ""
+
+    # Step 3: Regex patterns for common Indian lab parameters
+    LAB_PATTERNS = [
+        ("Hemoglobin", r"(?:Hemoglobin|Haemoglobin|Hb)\s*[:\-=]?\s*(\d+\.?\d*)\s*(g/dL|g/dl|gm/dL)?", "g/dL"),
+        ("ESR", r"ESR\s*[:\-=]?\s*(\d+\.?\d*)\s*(mm/hr|mm/h)?", "mm/hr"),
+        ("WBC", r"(?:WBC|TLC|Total\s+Leukocyte)\s*[:\-=]?\s*([\d,]+\.?\d*)\s*(/mcL|/uL|cells/mcL)?", "/mcL"),
+        ("Platelets", r"(?:Platelets?|PLT)\s*[:\-=]?\s*([\d,]+\.?\d*)\s*(/mcL|/uL|lakhs)?", "/mcL"),
+        ("Glucose", r"(?:Glucose|Blood\s+Sugar|RBS|FBS)\s*[:\-=]?\s*(\d+\.?\d*)\s*(mg/dL|mg/dl)?", "mg/dL"),
+    ]
+
+    findings = []
+    entities_to_add = []
+
+    for param_name, pattern, default_unit in LAB_PATTERNS:
+        match = re.search(pattern, raw_text, re.IGNORECASE)
+        if match:
+            val_str = match.group(1).replace(",", "")
+            unit = match.group(2) if match.lastindex >= 2 and match.group(2) else default_unit
+            try:
+                val_num = float(val_str)
+            except ValueError:
+                continue
+            status_flag, is_abnormal, ref_range = analyze_value(param_name, val_num)
+            findings.append({
+                "test": param_name,
+                "value": val_str,
+                "unit": unit,
+                "status": status_flag,
+                "refRange": ref_range,
+                "isAbnormal": is_abnormal
+            })
+            entities_to_add.append(ExtractedEntity(
+                entity_type="lab_test",
+                key_name=param_name,
+                value_text=val_str,
+                unit=unit,
+                reference_range=ref_range,
+                is_abnormal=is_abnormal,
+                status_flag=status_flag,
+                source_tag="extracted-from-document"
+            ))
+
+    # Step 4: Determine report metadata
+    report_type = "Lab Report" if findings else "Uploaded Document"
+    upload_date = datetime.utcnow().strftime("%d %b %Y")
+
+    if not raw_text.strip():
+        raw_text = f"[Binary file — no text content extracted]\nFile: {file.filename}"
 
     doc = Document(
         session_id=sessionId,
@@ -95,57 +151,29 @@ async def upload_document(
         file_path=stored_path,
         file_size=len(contents),
         mime_type=file.content_type or "application/octet-stream",
-        report_type="Lab Report",
-        report_date="12 Oct 2026",
-        raw_ocr_text=raw_text
+        report_type=report_type,
+        report_date=upload_date,
+        raw_ocr_text=raw_text[:4000]  # cap stored text
     )
     db.add(doc)
     db.commit()
     db.refresh(doc)
 
-    # Add entities
-    e1 = ExtractedEntity(
-        document_id=doc.id,
-        entity_type="lab_test",
-        key_name="Hemoglobin (Hb)",
-        value_text="11.2",
-        unit="g/dL",
-        reference_range="12.0 - 15.5",
-        is_abnormal=True,
-        status_flag="Low",
-        source_tag="extracted-from-document"
-    )
-    e2 = ExtractedEntity(
-        document_id=doc.id,
-        entity_type="lab_test",
-        key_name="ESR (Westergren)",
-        value_text="28",
-        unit="mm/hr",
-        reference_range="0 - 20",
-        is_abnormal=True,
-        status_flag="High",
-        source_tag="extracted-from-document"
-    )
-    e3 = ExtractedEntity(
-        document_id=doc.id,
-        entity_type="lab_test",
-        key_name="Total Leukocyte Count (TLC)",
-        value_text="7400",
-        unit="/mcL",
-        reference_range="4000 - 11000",
-        is_abnormal=False,
-        status_flag="Normal",
-        source_tag="extracted-from-document"
-    )
-    db.add_all([e1, e2, e3])
+    # Attach entities to document
+    for ent in entities_to_add:
+        ent.document_id = doc.id
+    db.add_all(entities_to_add)
 
-    # Add timeline event
+    # Add timeline event only if we extracted something meaningful
+    tl_desc = ", ".join(
+        f"{f['test']}: {f['value']} {f['unit']} ({f['status']})" for f in findings
+    ) if findings else "No structured lab values extracted from document."
     tl = TimelineEvent(
         patient_id=resolved_patient_id,
-        event_date="12 Oct 2026",
-        event_type="Lab Report",
-        title="CBC & ESR Lab Report Uploaded",
-        description="Hb: 11.2 g/dL (Low), ESR: 28 mm/hr (High)"
+        event_date=upload_date,
+        event_type=report_type,
+        title=f"Document Uploaded: {file.filename}",
+        description=tl_desc
     )
     db.add(tl)
     db.commit()
@@ -155,14 +183,10 @@ async def upload_document(
         "originalFilename": doc.original_filename,
         "reportType": doc.report_type,
         "date": doc.report_date,
-        "tests": "CBC, ESR",
-        "findings": [
-            {"test": "Hemoglobin (Hb)", "value": "11.2", "unit": "g/dL", "status": "Low", "refRange": "12.0 - 15.5", "isAbnormal": True},
-            {"test": "ESR (Westergren)", "value": "28", "unit": "mm/hr", "status": "High", "refRange": "0 - 20", "isAbnormal": True},
-            {"test": "Total Leukocyte Count (TLC)", "value": "7400", "unit": "/mcL", "status": "Normal", "refRange": "4000 - 11000", "isAbnormal": False}
-        ],
+        "tests": ", ".join(f["test"] for f in findings) if findings else "None extracted",
+        "findings": findings,
         "rawText": doc.raw_ocr_text,
-        "_demoMode": True
+        "_demoMode": False
     }
 
 @router.get("/patient/{patientId}")

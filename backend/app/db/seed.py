@@ -80,8 +80,8 @@ def seed_database():
                 patient_id=p1.id,
                 category="lab_marker",
                 severity="URGENT",
-                keyword_matched="ESR 28 mm/hr",
-                alert_message="Elevated ESR inflammatory marker (28 mm/hr)"
+                keyword_matched="elevated inflammatory markers (synthetic demo data)",
+                alert_message="Elevated inflammatory markers (synthetic demo — no real lab report scanned)"
             )
             db.add_all([rf1, rf2])
 
@@ -93,17 +93,15 @@ def seed_database():
                 file_path="uploads/doc_cbc_esr_001.pdf",
                 file_size=245000,
                 mime_type="application/pdf",
-                report_type="Lab Report",
+                report_type="SYNTHETIC DEMO — Not a real scan",
                 report_date="12 Oct 2026",
-                raw_ocr_text="Hb: 11.2 g/dL (Low)\nESR: 28 mm/hr (High)\nWBC: 7400 /mcL"
+                raw_ocr_text="[Synthetic demo document — no real file exists. Upload an actual report to extract values.]"
             )
             db.add(doc1)
             db.commit()
             db.refresh(doc1)
 
-            e1 = ExtractedEntity(document_id=doc1.id, entity_type="lab_test", key_name="Hemoglobin (Hb)", value_text="11.2", unit="g/dL", reference_range="12.0 - 15.5", is_abnormal=True, status_flag="Low")
-            e2 = ExtractedEntity(document_id=doc1.id, entity_type="lab_test", key_name="ESR", value_text="28", unit="mm/hr", reference_range="0 - 20", is_abnormal=True, status_flag="High")
-            db.add_all([e1, e2])
+            # NOTE: No ExtractedEntity rows — synthetic demo document has no real extracted values
 
             sum1 = ClinicalSummary(
                 session_id=s1.id,
@@ -114,9 +112,9 @@ def seed_database():
                 hpi_text="Gradual onset over past 3 days; throbbing frontal character. Associated with mild fever and generalized body ache. No vomiting, neck rigidity, or visual disturbances.",
                 past_medical="No known chronic illness (Hypertension/Diabetes negative)",
                 medications_allergies="Meds: Paracetamol 650mg SOS. Allergies: No known drug allergies (NKDA).",
-                document_findings="Scanned Lab Report (12 Oct 2026): Hb 11.2 g/dL (Low), ESR 28 mm/hr (High).",
+                document_findings="No real documents scanned yet. Upload a report to see extracted information.",
                 ayurveda_summary="Prakriti: Pitta-Vata | Agni: Tikshnagni | Koshta: Madhyama (Prototype)",
-                ai_draft_observations="Reported acute febrile illness symptoms of 3 days duration with elevated inflammatory marker (ESR 28 mm/hr) and mild anemia (Hb 11.2 g/dL). Kindly correlate clinically. (No autonomous diagnosis rendered)."
+                ai_draft_observations="Reported acute febrile illness symptoms of 3 days duration. Kindly correlate clinically. (No autonomous diagnosis rendered)."
             )
             db.add(sum1)
             db.commit()
