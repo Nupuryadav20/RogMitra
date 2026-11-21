@@ -27,33 +27,19 @@ export const doc_AV_CBC = {
   documentType: 'Lab Report',
   labName: 'SynthLab Diagnostics (Demo)',
   reportDate: '2026-11-14',
-  ocrRawText: `COMPLETE BLOOD COUNT & INFLAMMATORY MARKERS
-Patient: Ananya Verma | Age/Sex: 28F | Ref. No: DEMO-001
-Date: 14-Nov-2026
+  ocrRawText: `SAMPLE MEDICAL DOCUMENT
+Patient: Ananya Verma | Age/Sex: 28F
+Date: Recent
 
-Hemoglobin     11.2 g/dL    [Ref: 12.0-15.0]  ** LOW **
-WBC Count      11800 /µL    [Ref: 4000-11000]  ** HIGH **
-Neutrophils    72%           [Ref: 40-70%]      * HIGH *
-Lymphocytes    20%           [Ref: 20-40%]      Normal
-Platelets      2.2 Lakh/µL  [Ref: 1.5-4.0]    Normal
-ESR            48 mm/hr     [Ref: 0-20]        ** HIGH **
-CRP            24 mg/L      [Ref: <5]          ** HIGH **
+NOTE: This is a prototype document slot. Real reports display extracted values only upon user upload.`,
 
-NOTE: This is a SYNTHETIC DEMO report. Not for clinical use.`,
-
-  extractedValues: [
-    param('Hemoglobin', 11.2, 'g/dL', '12.0–15.0 (F)', true, 'LOW — mild anaemia'),
-    param('WBC Count', 11800, '/µL', '4000–11000', true, 'HIGH — leukocytosis'),
-    param('Neutrophils', 72, '%', '40–70%', true, 'HIGH — neutrophilia'),
-    param('Lymphocytes', 20, '%', '20–40%', false, 'Normal'),
-    param('Platelets', 220000, '/µL', '150000–400000', false, 'Normal'),
-    param('ESR', 48, 'mm/hr', '0–20', true, 'HIGH — elevated inflammatory marker'),
+  extractedValues: [],
     param('CRP', 24, 'mg/L', '<5', true, 'HIGH — elevated acute phase reactant'),
   ],
 
   abnormalSummary: {
-    en: 'Elevated ESR (48), CRP (24), mild leukocytosis (WBC 11800), and mild anaemia (Hb 11.2). Suggests active inflammatory process.',
-    hi: 'ESR (48), CRP (24) ऊंचा, हल्का ल्यूकोसाइटोसिस (WBC 11800), और हल्का एनीमिया (Hb 11.2)। सक्रिय सूजन प्रक्रिया का संकेत।',
+    en: 'Sample uploaded medical document.',
+    hi: 'नमूना अपलोड किया गया चिकित्सा दस्तावेज़।',
   },
 };
 

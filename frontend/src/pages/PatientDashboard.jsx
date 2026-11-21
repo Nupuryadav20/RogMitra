@@ -1,6 +1,6 @@
 // PatientDashboard.jsx — Screen 2: Patient Friendly Dashboard
 // Theme 3: Soft Green (#0D7A46), Light Mint (#EDF8F1), Canvas (#F4FBF7), Rounded Cards, 4 Quick Actions
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import AppLayout from '../layouts/AppLayout';
 import useAppStore from '../store/appStore';
+import { sessionApi, documentApi } from '../services/api';
 
 // Determine greeting by time of day
 function getGreeting(isHi) {
@@ -22,10 +23,29 @@ export default function PatientDashboard() {
   const { t, i18n } = useTranslation();
   const isHi = i18n.language?.startsWith('hi');
   const navigate = useNavigate();
-  const { user, interview, documents, ayurveda } = useAppStore();
+  const { user, interview, documents, ayurveda, saveAnswer, addDocument } = useAppStore();
 
   const patientName = user?.name || user?.full_name || (isHi ? 'अनन्या वर्मा' : 'Ananya Verma');
   const greeting = getGreeting(isHi);
+
+  // Reload saved session and documents from backend DB
+  useEffect(() => {
+    if (user?.id) {
+      sessionApi.getLatestSession(user.id).then((sess) => {
+        if (sess && sess.answers && Array.isArray(sess.answers)) {
+          sess.answers.forEach((ans) => {
+            saveAnswer(ans.field_name, ans.answer_text);
+          });
+        }
+      }).catch(() => {});
+
+      documentApi.getPatientDocuments(user.id).then((docs) => {
+        if (Array.isArray(docs) && docs.length > 0) {
+          docs.forEach(d => addDocument(d));
+        }
+      }).catch(() => {});
+    }
+  }, [user?.id]);
 
   // Flow progress steps
   const interviewDone = interview.conversationHistory.length > 0 || !!interview.answers.chief_complaint;
@@ -356,7 +376,7 @@ export default function PatientDashboard() {
                 </div>
                 <div>
                   <h5 className="font-semibold text-xs text-gray-900">General OPD Consultation</h5>
-                  <p className="text-[11px] text-gray-500 mt-0.5">CBC & ESR Lab Report attached</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Clinical consultation record</p>
                   <span className="inline-block mt-1 text-[10px] text-brand font-medium">Dr. R. Sharma • Approved</span>
                 </div>
               </div>

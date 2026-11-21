@@ -75,33 +75,7 @@ def seed_database():
                 keyword_matched="headache for 3 days",
                 alert_message="Persistent headache (> 3 days duration)"
             )
-            rf2 = RedFlagAlert(
-                session_id=s1.id,
-                patient_id=p1.id,
-                category="lab_marker",
-                severity="URGENT",
-                keyword_matched="elevated inflammatory markers (synthetic demo data)",
-                alert_message="Elevated inflammatory markers (synthetic demo — no real lab report scanned)"
-            )
-            db.add_all([rf1, rf2])
-
-            doc1 = Document(
-                session_id=s1.id,
-                patient_id=p1.id,
-                original_filename="CBC_ESR_Report.pdf",
-                stored_filename="doc_cbc_esr_001.pdf",
-                file_path="uploads/doc_cbc_esr_001.pdf",
-                file_size=245000,
-                mime_type="application/pdf",
-                report_type="SYNTHETIC DEMO — Not a real scan",
-                report_date="12 Oct 2026",
-                raw_ocr_text="[Synthetic demo document — no real file exists. Upload an actual report to extract values.]"
-            )
-            db.add(doc1)
-            db.commit()
-            db.refresh(doc1)
-
-            # NOTE: No ExtractedEntity rows — synthetic demo document has no real extracted values
+            db.add(rf1)
 
             sum1 = ClinicalSummary(
                 session_id=s1.id,
@@ -112,9 +86,9 @@ def seed_database():
                 hpi_text="Gradual onset over past 3 days; throbbing frontal character. Associated with mild fever and generalized body ache. No vomiting, neck rigidity, or visual disturbances.",
                 past_medical="No known chronic illness (Hypertension/Diabetes negative)",
                 medications_allergies="Meds: Paracetamol 650mg SOS. Allergies: No known drug allergies (NKDA).",
-                document_findings="No real documents scanned yet. Upload a report to see extracted information.",
+                document_findings=None,
                 ayurveda_summary="Prakriti: Pitta-Vata | Agni: Tikshnagni | Koshta: Madhyama (Prototype)",
-                ai_draft_observations="Reported acute febrile illness symptoms of 3 days duration. Kindly correlate clinically. (No autonomous diagnosis rendered)."
+                ai_draft_observations="Reported acute febrile symptoms of 3 days duration with mild low-grade fever and localized frontal headache. Kindly correlate clinically. (No autonomous diagnosis rendered)."
             )
             db.add(sum1)
             db.commit()

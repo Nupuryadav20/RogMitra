@@ -47,16 +47,6 @@ export default function SummaryPage() {
           code: { text: interview.answers.chief_complaint || "Headache with fever" },
           subject: { reference: `Patient/${user?.id || 'pat-demo-1'}` }
         }
-      },
-      {
-        resource: {
-          resourceType: "Observation",
-          id: "obs-esr",
-          status: "final",
-          code: { text: "Erythrocyte sedimentation rate (ESR)" },
-          valueQuantity: { value: 28, unit: "mm/hr" },
-          interpretation: [{ text: "High" }]
-        }
       }
     ]
   };
@@ -210,17 +200,37 @@ export default function SummaryPage() {
               <h4 className="font-bold text-xs text-gray-900 uppercase tracking-wider">5. Uploaded Document Findings</h4>
               <SourceTag source="document" />
             </div>
-            <div className="text-xs text-gray-800 bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-1.5">
-              <p className="font-semibold text-gray-700">Lab Report (12 Oct 2026):</p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                <span className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 text-[11px] font-semibold border border-amber-200">
-                  Hemoglobin: 11.2 g/dL (Low)
-                </span>
-                <span className="px-2.5 py-1 rounded-lg bg-red-100 text-red-800 text-[11px] font-semibold border border-red-200">
-                  ESR: 28 mm/hr (High)
-                </span>
+            {documents && documents.length > 0 ? (
+              <div className="space-y-2">
+                {documents.map((doc, di) => (
+                  <div key={doc.id || di} className="text-xs text-gray-800 bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-1.5">
+                    <p className="font-semibold text-gray-700">{doc.fileName || doc.filename || 'Uploaded Document'}:</p>
+                    {doc.findings && doc.findings.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {doc.findings.map((item, idx) => (
+                          <span
+                            key={idx}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${
+                              item.status === 'High' ? 'bg-red-100 text-red-800 border-red-200' :
+                              item.status === 'Low' ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                              'bg-emerald-100 text-emerald-800 border-emerald-200'
+                            }`}
+                          >
+                            {item.test}: {item.value} {item.unit} ({item.status})
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">No tabular parameters extracted.</p>
+                    )}
+                  </div>
+                ))}
               </div>
-            </div>
+            ) : (
+              <p className="text-xs text-gray-500 italic p-3 rounded-xl bg-gray-50 border border-gray-100">
+                No document scanned yet.
+              </p>
+            )}
           </div>
 
           {/* Ayurvedic Assessment */}
@@ -247,7 +257,9 @@ export default function SummaryPage() {
               <SourceTag source="ai" />
             </div>
             <p className="text-xs text-emerald-900 leading-relaxed">
-              Reported acute febrile illness symptoms of 3 days duration with elevated inflammatory marker (ESR 28 mm/hr) and mild anemia (Hb 11.2 g/dL). Kindly correlate clinically.
+              {interview.answers.chief_complaint
+                ? `Reported symptoms of '${interview.answers.chief_complaint}'. ${documents && documents.length > 0 ? 'Document findings noted above.' : 'No physical documents scanned yet.'} Kindly correlate clinically.`
+                : 'Reported symptoms recorded for physician review. Kindly correlate clinically.'}
             </p>
             <span className="block text-[10px] text-gray-400">
               *Rule 1 compliant: strictly non-diagnostic; presents factual correlations only for physician interpretation.

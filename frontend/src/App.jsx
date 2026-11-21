@@ -1,5 +1,5 @@
 // App.jsx — RogMitra Root Router & Role Guards
-// Manages navigation across all 6 Theme 3 screens: Login, Patient Dashboard, Voice Interview, Scanner, Ayurveda, Doctor
+// Manages navigation across all Theme 3 screens: Login, Patient Dashboard, Voice Interview, Scanner, Ayurveda, Doctor Workspace
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './i18n';
@@ -10,6 +10,10 @@ import VoiceInterviewPage from './pages/VoiceInterviewPage';
 import DocumentScannerPage from './pages/DocumentScannerPage';
 import AyurvedaPage from './pages/AyurvedaPage';
 import DoctorDashboard from './pages/DoctorDashboard';
+import OpdQueuePage from './pages/OpdQueuePage';
+import DoctorSummariesPage from './pages/DoctorSummariesPage';
+import DoctorReportsPage from './pages/DoctorReportsPage';
+import DoctorSettingsPage from './pages/DoctorSettingsPage';
 import SummaryPage from './pages/SummaryPage';
 import useAppStore from './store/appStore';
 
@@ -33,6 +37,15 @@ function DoctorRoute({ children }) {
   }
   if (role !== 'doctor') {
     return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+}
+
+// Protected Route for Authenticated Users (Both Patient and Doctor)
+function AuthenticatedRoute({ children }) {
+  const { user } = useAppStore();
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
   return children;
 }
@@ -94,13 +107,53 @@ export default function App() {
           }
         />
 
-        {/* Full Clinical Summary Review View */}
+        {/* Doctor Workspace: OPD Queue */}
+        <Route
+          path="/doctor/queue"
+          element={
+            <DoctorRoute>
+              <OpdQueuePage />
+            </DoctorRoute>
+          }
+        />
+
+        {/* Doctor Workspace: Summaries Directory */}
+        <Route
+          path="/doctor/summaries"
+          element={
+            <DoctorRoute>
+              <DoctorSummariesPage />
+            </DoctorRoute>
+          }
+        />
+
+        {/* Doctor Workspace: Uploaded Reports Directory */}
+        <Route
+          path="/doctor/reports"
+          element={
+            <DoctorRoute>
+              <DoctorReportsPage />
+            </DoctorRoute>
+          }
+        />
+
+        {/* Doctor Workspace: Settings */}
+        <Route
+          path="/doctor/settings"
+          element={
+            <DoctorRoute>
+              <DoctorSettingsPage />
+            </DoctorRoute>
+          }
+        />
+
+        {/* Full Clinical Summary Review View — Accessible to both Patient & Doctor */}
         <Route
           path="/summary"
           element={
-            <PatientRoute>
+            <AuthenticatedRoute>
               <SummaryPage />
-            </PatientRoute>
+            </AuthenticatedRoute>
           }
         />
 

@@ -13,15 +13,41 @@ import RedFlagBanner from '../components/RedFlagBanner';
 import useAppStore from '../store/appStore';
 import { DIALOGUE_STEPS, INITIAL_QUESTIONS } from '../data/dialogueFlow';
 import { checkRedFlags } from '../data/redFlagRules';
+import { sessionApi } from '../services/api';
 
 export default function VoiceInterviewPage() {
   const { i18n } = useTranslation();
   const isHi = i18n.language?.startsWith('hi');
   const navigate = useNavigate();
 
-  const { interview, saveAnswer, addConversationTurn, addRedFlag } = useAppStore();
+  const { user, interview, saveAnswer, addConversationTurn, addRedFlag } = useAppStore();
 
+  const [sessionId, setSessionId] = useState(interview.sessionId || null);
   const [currentIndex, setCurrentIndex] = useState(interview.currentQuestionIndex || 0);
+
+  // Reload session from database on mount
+  useEffect(() => {
+    if (user?.id) {
+      sessionApi.getLatestSession(user.id).then((sess) => {
+        if (sess && sess.id) {
+          setSessionId(sess.id);
+          if (sess.answers && Array.isArray(sess.answers)) {
+            sess.answers.forEach((ans) => {
+              saveAnswer(ans.field_name, ans.answer_text);
+            });
+            const count = sess.answers.length;
+            if (count > 0 && count < INITIAL_QUESTIONS.length) {
+              setCurrentIndex(count);
+            }
+          }
+        } else {
+          sessionApi.startSession(user.id, isHi ? 'hi' : 'en').then((s) => {
+            if (s?.id) setSessionId(s.id);
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }, [user?.id]);
   const [isListening, setIsListening] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -130,7 +156,7 @@ export default function VoiceInterviewPage() {
     setTranscript(chipText);
   };
 
-  const handleSubmitAnswer = (answerValue) => {
+  const handleSubmitAnswer = async (answerValue) => {
     const value = answerValue || manualText || transcript;
     if (!value || !value.trim()) return;
 
@@ -152,6 +178,26 @@ export default function VoiceInterviewPage() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
 
+    // Save answer directly to backend database
+    let activeSessionId = sessionId;
+    if (!activeSessionId && user?.id) {
+      try {
+        const newSess = await sessionApi.startSession(user.id, isHi ? 'hi' : 'en');
+        activeSessionId = newSess?.id;
+        setSessionId(activeSessionId);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    if (activeSessionId) {
+      sessionApi.saveAnswer(
+        activeSessionId,
+        currentQuestion.field,
+        value.trim(),
+        transcript ? 'voice' : 'touch'
+      ).catch(console.error);
+    }
+
     setManualText('');
     setTranscript('');
 
@@ -159,6 +205,9 @@ export default function VoiceInterviewPage() {
     if (currentIndex < INITIAL_QUESTIONS.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
+      if (activeSessionId) {
+        sessionApi.submitSession(activeSessionId).catch(console.error);
+      }
       navigate('/summary');
     }
   };

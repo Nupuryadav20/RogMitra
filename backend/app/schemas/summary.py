@@ -3,13 +3,13 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
 class SummaryReviewSchema(BaseModel):
-    summaryId: str
+    summaryId: Optional[str] = None
     doctorNotes: Optional[str] = None
     editedFields: Optional[Dict[str, str]] = None
     doctorName: Optional[str] = None
 
 class SummaryRejectSchema(BaseModel):
-    summaryId: str
+    summaryId: Optional[str] = None
     reason: str
     doctorName: Optional[str] = None
 

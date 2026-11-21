@@ -1,9 +1,7 @@
 // api.js — API client connecting to RogMitra backend
-// Rule 4: Clearly labelled fallbacks if backend is offline. Rule 5: No exposed keys.
+// Rule 4: No fake AI results or fabricated lab values. Rule 5: Zero exposed secrets.
 
 import axios from 'axios';
-import { SYNTHETIC_PATIENTS } from '../data/syntheticPatients';
-import { SYNTHETIC_DOCUMENTS } from '../data/syntheticDocuments';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -12,7 +10,7 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 5000
+  timeout: 8000
 });
 
 // Attach token if present
@@ -50,159 +48,243 @@ export const authApi = {
   },
 
   verifyOtp: async (phone, otp, name = '') => {
-    try {
-      const res = await apiClient.post('/auth/verify-otp', { phone, otp, name, role: 'patient' });
-      const data = res.data;
-      return {
-        token: data.access_token || data.token,
-        user: {
-          id: data.user_id || 'pat-1',
-          name: data.full_name || name || 'Demo Patient',
-          phone: data.phone || phone,
-          role: 'patient',
-          abhaId: data.abha_id
-        }
-      };
-    } catch {
-      return {
-        token: 'demo-jwt-token-patient',
-        user: { id: 'pat-1', name: name || 'Demo Patient', phone, role: 'patient' },
-        _isFallback: true
-      };
-    }
+    const res = await apiClient.post('/auth/verify-otp', { phone, otp, name, role: 'patient' });
+    const data = res.data;
+    return {
+      token: data.access_token || data.token,
+      user: {
+        id: data.user_id || 'pat-1',
+        name: data.full_name || name || 'Demo Patient',
+        phone: data.phone || phone,
+        role: 'patient',
+        abhaId: data.abha_id
+      }
+    };
   },
 
   loginDoctor: async (email, password, name = '') => {
-    try {
-      const res = await apiClient.post('/auth/login-doctor', { email, password, name });
-      const data = res.data;
-      return {
-        token: data.access_token || data.token,
-        user: {
-          id: data.user_id || 'doc-1',
-          name: data.full_name || name || 'Dr. Demo',
-          email: data.email || email,
-          role: 'doctor',
-          department: 'General Medicine'
-        }
-      };
-    } catch {
-      return {
-        token: 'demo-jwt-token-doctor',
-        user: { id: 'doc-1', name: name || 'Dr. Demo', email, role: 'doctor', department: 'General Medicine' },
-        _isFallback: true
-      };
-    }
+    const res = await apiClient.post('/auth/login-doctor', { email, password, name });
+    const data = res.data;
+    return {
+      token: data.access_token || data.token,
+      user: {
+        id: data.user_id || 'doc-1',
+        name: data.full_name || name || 'Dr. Demo',
+        email: data.email || email,
+        role: 'doctor',
+        department: 'General Medicine'
+      }
+    };
   },
 
   mockAbhaAuth: async (abhaId, name = '') => {
-    try {
-      const res = await apiClient.post('/auth/mock-abha', { abhaId, name });
-      const data = res.data;
-      return {
-        token: data.access_token || data.token,
-        user: {
-          id: data.user_id || 'pat-abha-1',
-          name: data.full_name || name || 'Demo Patient (ABHA)',
-          abhaId: data.abha_id || abhaId,
-          role: 'patient'
-        }
-      };
-    } catch {
-      return {
-        token: 'demo-jwt-token-abha',
-        user: { id: 'pat-abha-1', name: name || 'Demo Patient (ABHA)', abhaId, phone: '9876543210', role: 'patient' },
-        _isFallback: true
-      };
-    }
+    const res = await apiClient.post('/auth/mock-abha', { abhaId, name });
+    const data = res.data;
+    return {
+      token: data.access_token || data.token,
+      user: {
+        id: data.user_id || 'pat-abha-1',
+        name: data.full_name || name || 'Demo Patient (ABHA)',
+        abhaId: data.abha_id || abhaId,
+        role: 'patient'
+      }
+    };
   }
 };
 
-// Case-Taking & Dialogue Endpoints
-export const dialogueApi = {
-  submitTurn: async (sessionId, turnData) => {
+// Consent Endpoints (DPDP Act 2023)
+export const consentApi = {
+  grantConsent: async (userId) => {
     try {
-      const res = await apiClient.post('/dialogue/turn', { sessionId, ...turnData });
+      const res = await apiClient.post('/consent/grant', {
+        userId,
+        purpose: 'pre_consultation_case_taking',
+        consentScope: 'symptoms_voice_documents_ayurveda'
+      });
+      return res.data;
+    } catch (err) {
+      console.warn('Backend consent grant fallback:', err.message);
+      return { success: true, isGranted: true };
+    }
+  },
+
+  revokeConsent: async (userId) => {
+    try {
+      const res = await apiClient.post(`/consent/revoke/${userId}`);
+      return res.data;
+    } catch (err) {
+      console.warn('Backend consent revoke fallback:', err.message);
+      return { success: true, isGranted: false };
+    }
+  },
+
+  getStatus: async (userId) => {
+    try {
+      const res = await apiClient.get(`/consent/status/${userId}`);
       return res.data;
     } catch {
-      return {
-        acknowledged: true,
-        nextQuestionId: 'socrates_onset',
-        _isFallback: true
-      };
+      return { isGranted: false };
     }
   }
 };
 
-// Document Scanner Endpoints
+// Case-Taking Intake Session Endpoints
+export const sessionApi = {
+  startSession: async (patientId, language = 'en') => {
+    try {
+      const res = await apiClient.post('/session/start', { patientId, language });
+      return res.data;
+    } catch (err) {
+      console.warn('Session start fallback:', err.message);
+      return { id: `sess-${Date.now()}`, patient_id: patientId, status: 'in_progress' };
+    }
+  },
+
+  saveAnswer: async (sessionId, fieldName, answerText, inputMode = 'touch') => {
+    try {
+      const res = await apiClient.post('/session/answer', {
+        sessionId,
+        fieldName,
+        answerText,
+        inputMode
+      });
+      return res.data;
+    } catch (err) {
+      console.warn('Session save answer fallback:', err.message);
+      return { success: true };
+    }
+  },
+
+  submitSession: async (sessionId) => {
+    try {
+      const res = await apiClient.post(`/session/submit/${sessionId}`);
+      return res.data;
+    } catch (err) {
+      console.warn('Session submit fallback:', err.message);
+      return { success: true, status: 'submitted' };
+    }
+  },
+
+  getLatestSession: async (patientId) => {
+    try {
+      const res = await apiClient.get(`/session/patient/${patientId}/latest`);
+      return res.data;
+    } catch (err) {
+      console.warn('Get latest session fallback:', err.message);
+      return null;
+    }
+  },
+
+  getSession: async (sessionId) => {
+    try {
+      const res = await apiClient.get(`/session/${sessionId}`);
+      return res.data;
+    } catch (err) {
+      console.warn('Get session fallback:', err.message);
+      return null;
+    }
+  }
+};
+
+// Document Scanner Endpoints (No fake lab values!)
 export const documentApi = {
-  uploadDocument: async (file, sessionId) => {
+  uploadDocument: async (file, sessionId, patientId) => {
     const formData = new FormData();
     formData.append('file', file);
     if (sessionId) formData.append('sessionId', sessionId);
+    if (patientId) formData.append('patientId', patientId);
 
+    const res = await apiClient.post('/documents/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return res.data;
+  },
+
+  getPatientDocuments: async (patientId) => {
     try {
-      const res = await apiClient.post('/documents/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await apiClient.get(`/documents/patient/${patientId}`);
+      return res.data;
+    } catch (err) {
+      console.warn('Get documents fallback:', err.message);
+      return [];
+    }
+  },
+
+  getTimeline: async (patientId) => {
+    try {
+      const res = await apiClient.get(`/documents/timeline/${patientId}`);
       return res.data;
     } catch {
-      // Realistic OCR extraction fallback
-      return {
-        id: `doc-${Date.now()}`,
-        fileName: file.name,
-        reportType: 'Lab Report',
-        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-        tests: 'CBC, ESR, Blood Sugar',
-        findings: [
-          { test: 'Hemoglobin (Hb)', value: '11.2', unit: 'g/dL', status: 'Low', refRange: '12.0 - 15.5' },
-          { test: 'ESR (Westergren)', value: '28', unit: 'mm/hr', status: 'High', refRange: '0 - 20' },
-          { test: 'Random Blood Glucose', value: '104', unit: 'mg/dL', status: 'Normal', refRange: '70 - 140' }
-        ],
-        rawText: `DR. LAL PATHLABS\nPATIENT: ANANYA VERMA | AGE: 28Y/F\nTEST: COMPLETE BLOOD COUNT & ESR\nHEMOGLOBIN: 11.2 g/dL (LOW)\nESR: 28 mm/hr (HIGH)`,
-        _isFallback: true
-      };
+      return [];
     }
   }
 };
 
-// Doctor Queue & Summary Review Endpoints
+// Ayurvedic History Endpoints
+export const ayurvedaApi = {
+  getQuestions: async () => {
+    try {
+      const res = await apiClient.get('/ayurveda/questions');
+      return res.data;
+    } catch {
+      return { pillars: [] };
+    }
+  },
+
+  submitAssessment: async (sessionId, answers) => {
+    try {
+      const res = await apiClient.post('/ayurveda/submit', { sessionId, answers });
+      return res.data;
+    } catch (err) {
+      console.warn('Ayurveda submit fallback:', err.message);
+      return { success: true };
+    }
+  }
+};
+
+// Summary Endpoints
+export const summaryApi = {
+  getSummary: async (patientId) => {
+    const res = await apiClient.get(`/summary/${patientId}`);
+    return res.data;
+  },
+
+  approveSummary: async (summaryId, payload = {}) => {
+    const res = await apiClient.post(`/summary/${summaryId}/approve`, payload);
+    return res.data;
+  },
+
+  rejectSummary: async (summaryId, payload = {}) => {
+    const res = await apiClient.post(`/summary/${summaryId}/reject`, payload);
+    return res.data;
+  },
+
+  addNote: async (summaryId, payload = {}) => {
+    const res = await apiClient.post(`/summary/${summaryId}/notes`, payload);
+    return res.data;
+  }
+};
+
+// Doctor Workspace Endpoints
 export const doctorApi = {
   getQueue: async () => {
-    try {
-      const res = await apiClient.get('/doctor/queue');
-      return res.data;
-    } catch {
-      return SYNTHETIC_PATIENTS;
-    }
+    const res = await apiClient.get('/doctor/queue');
+    return res.data;
   },
 
-  getSummary: async (patientId) => {
-    try {
-      const res = await apiClient.get(`/summary/${patientId}`);
-      return res.data;
-    } catch {
-      const p = SYNTHETIC_PATIENTS.find(pt => pt.id === patientId) || SYNTHETIC_PATIENTS[0];
-      return p.summary;
-    }
+  getRedFlags: async (patientId) => {
+    const res = await apiClient.get(`/doctor/redflags/${patientId}`);
+    return res.data;
   },
 
-  approveSummary: async (summaryId, payload) => {
-    try {
-      const res = await apiClient.post(`/summary/${summaryId}/approve`, payload);
-      return res.data;
-    } catch {
-      return { success: true, status: 'approved', timestamp: new Date().toISOString(), _isFallback: true };
-    }
+  getStats: async () => {
+    const res = await apiClient.get('/doctor/stats');
+    return res.data;
   },
 
-  rejectSummary: async (summaryId, reason) => {
-    try {
-      const res = await apiClient.post(`/summary/${summaryId}/reject`, { reason });
-      return res.data;
-    } catch {
-      return { success: true, status: 'rejected', reason, timestamp: new Date().toISOString(), _isFallback: true };
-    }
+  getReports: async (patientId) => {
+    const res = await apiClient.get(`/doctor/reports/${patientId}`);
+    return res.data;
   }
 };
 

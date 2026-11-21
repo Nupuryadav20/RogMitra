@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Mic, FileText, Leaf, ClipboardList,
-  Stethoscope, LogOut, Menu, X, ChevronRight
+  Stethoscope, LogOut, Menu, X, ChevronRight, Users, Settings
 } from 'lucide-react';
 import Logo from '../components/Logo';
 import DemoBadge from '../components/DemoBadge';
@@ -21,6 +21,10 @@ const PATIENT_NAV = [
 
 const DOCTOR_NAV = [
   { to: '/doctor', icon: Stethoscope, label: 'Doctor Dashboard', labelHi: 'डॉक्टर डैशबोर्ड' },
+  { to: '/doctor/queue', icon: Users, label: 'OPD Queue', labelHi: 'ओपीडी कतार' },
+  { to: '/doctor/summaries', icon: ClipboardList, label: 'Patient Summaries', labelHi: 'रोगी सारांश' },
+  { to: '/doctor/reports', icon: FileText, label: 'Uploaded Reports', labelHi: 'दस्तावेज़ रिपोर्ट्स' },
+  { to: '/doctor/settings', icon: Settings, label: 'Settings', labelHi: 'सेटिंग्स' },
 ];
 
 export default function AppLayout({ children }) {

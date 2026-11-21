@@ -16,7 +16,7 @@ export default function DocumentScannerPage() {
   const isHi = i18n.language?.startsWith('hi');
   const navigate = useNavigate();
 
-  const { documents, addDocument } = useAppStore();
+  const { user, interview, documents, addDocument } = useAppStore();
 
   const [selectedDocIndex, setSelectedDocIndex] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -31,7 +31,7 @@ export default function DocumentScannerPage() {
 
     setUploading(true);
     try {
-      const extracted = await documentApi.uploadDocument(file);
+      const extracted = await documentApi.uploadDocument(file, interview?.sessionId, user?.id);
       addDocument(extracted);
       setSelectedDocIndex(0);
     } catch (err) {
@@ -190,7 +190,7 @@ export default function DocumentScannerPage() {
                   <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
                     Test(s) Mentioned
                   </span>
-                  <span className="font-bold text-gray-900 text-sm">{activeDoc.tests || 'Complete Blood Count (CBC), ESR'}</span>
+                  <span className="font-bold text-gray-900 text-sm">{activeDoc.tests || activeDoc.reportType || 'General Medical Report'}</span>
                 </div>
 
                 {/* Key Findings List with Abnormal Badges */}

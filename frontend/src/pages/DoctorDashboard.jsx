@@ -1,21 +1,22 @@
-// DoctorDashboard.jsx — Screen 6: Doctor Dashboard & AI Clinical Summary
+// DoctorDashboard.jsx — Screen 6: Doctor Consultation Dashboard & AI Clinical Summary
 // Rule 1: Panel strictly renamed to "AI Draft Observations (for physician review)" with reported facts only (NO DIAGNOSIS)
 // Rule 2: Three-tier visual source tags: 🟢 Patient-Reported, 🔵 Doc-Extracted, 🟡 AI-Draft. Doctor edit/approve/reject controls.
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// Rule 4: Zero fake lab values. Only real uploaded records are shown.
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Stethoscope, Users, FileText, CheckCircle2, XCircle, Edit3,
   Save, AlertTriangle, Clock, ChevronRight, User, ShieldCheck,
   ClipboardList, PlusCircle, Sparkles, AlertOctagon, Download,
-  Filter
+  Filter, Search, RefreshCw, AlertCircle
 } from 'lucide-react';
 import AppLayout from '../layouts/AppLayout';
 import SourceTag from '../components/SourceTag';
 import RedFlagBanner from '../components/RedFlagBanner';
 import { useToast } from '../components/Toast';
 import useAppStore from '../store/appStore';
-import { SYNTHETIC_PATIENTS } from '../data/syntheticPatients';
+import { doctorApi, summaryApi } from '../services/api';
 
 // Status chip helper
 function StatusChip({ status }) {
@@ -26,15 +27,22 @@ function StatusChip({ status }) {
       </span>
     );
   }
-  if (status === 'summary_ready') {
+  if (status === 'reviewed' || status === 'approved') {
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
-        ✓ Summary Ready
+        ✓ Approved
+      </span>
+    );
+  }
+  if (status === 'rejected') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+        ✗ Rejected
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
       Pending
     </span>
   );
@@ -44,44 +52,164 @@ export default function DoctorDashboard() {
   const { i18n } = useTranslation();
   const isHi = i18n.language?.startsWith('hi');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { show: showToast, ToastContainer } = useToast();
 
-  const { user, doctorReview, selectDoctorPatient, approveSummary, rejectSummary, updateDoctorNote } = useAppStore();
+  const { user } = useAppStore();
   const doctorDisplayName = user?.name || user?.full_name || 'Dr. R. Sharma';
+
+  const [queue, setQueue] = useState([]);
+  const [loadingQueue, setLoadingQueue] = useState(true);
+  const [activePatientId, setActivePatientId] = useState('');
+  const [summary, setSummary] = useState(null);
+  const [redFlags, setRedFlags] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   const [activeTab, setActiveTab] = useState('clinical'); // 'clinical' | 'reports' | 'ayurveda'
   const [isEditing, setIsEditing] = useState(false);
+  const [editedComplaint, setEditedComplaint] = useState('');
+  const [editedHpi, setEditedHpi] = useState('');
+  const [editedPast, setEditedPast] = useState('');
+  const [editedMeds, setEditedMeds] = useState('');
+
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [doctorNotes, setDoctorNotes] = useState('');
   const [rejectModal, setRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [approveModal, setApproveModal] = useState(false);
   const [queueFilter, setQueueFilter] = useState('all'); // 'all' | 'pending' | 'redflags' | 'reviewed'
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Selected patient from queue
-  const currentPatient = SYNTHETIC_PATIENTS.find(p => p.id === doctorReview.activePatientId) || SYNTHETIC_PATIENTS[0];
-  const summary = currentPatient.summary || {};
-  const status = doctorReview.summaryStatus || 'draft';
+  // 1. Fetch OPD Queue
+  const fetchQueue = async () => {
+    setLoadingQueue(true);
+    try {
+      const data = await doctorApi.getQueue();
+      const list = Array.isArray(data) ? data : [];
+      setQueue(list);
+
+      // Check URL query param or default to first patient
+      const urlPid = searchParams.get('patientId');
+      if (urlPid && list.some(p => p.id === urlPid)) {
+        setActivePatientId(urlPid);
+      } else if (list.length > 0 && !activePatientId) {
+        setActivePatientId(list[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to load queue:', err);
+    } finally {
+      setLoadingQueue(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQueue();
+  }, []);
+
+  // 2. Fetch Active Patient Details whenever activePatientId changes
+  useEffect(() => {
+    if (!activePatientId) return;
+    setLoadingSummary(true);
+
+    Promise.all([
+      summaryApi.getSummary(activePatientId).catch(() => null),
+      doctorApi.getRedFlags(activePatientId).catch(() => []),
+      doctorApi.getReports(activePatientId).catch(() => [])
+    ]).then(([sumData, rfData, repData]) => {
+      setSummary(sumData);
+      setRedFlags(Array.isArray(rfData) ? rfData : []);
+      setReports(Array.isArray(repData) ? repData : []);
+
+      if (sumData) {
+        setEditedComplaint(sumData.presentingComplaint || '');
+        setEditedHpi(sumData.hpi || '');
+        setEditedPast(sumData.pastHistory || '');
+        setEditedMeds(sumData.medicationsAllergies || '');
+        setDoctorNotes(sumData.doctorNotes || '');
+      }
+      setLoadingSummary(false);
+    });
+  }, [activePatientId]);
+
+  const currentPatient = queue.find(p => p.id === activePatientId) || queue[0] || {
+    id: 'pat-1',
+    name: 'Ananya Verma',
+    tokenNumber: '#OPD-201',
+    age: 28,
+    gender: 'Female',
+    timeWaiting: '10 mins ago',
+    chiefComplaint: 'Headache for 3 days',
+    status: 'pending'
+  };
+
+  const status = summary?.status || currentPatient.status || 'draft';
 
   // Filtered queue
-  const filteredPatients = SYNTHETIC_PATIENTS.filter(pt => {
-    if (queueFilter === 'redflags') return pt.redFlags && pt.redFlags.length > 0;
-    if (queueFilter === 'pending') return !pt.redFlags || pt.redFlags.length === 0;
-    if (queueFilter === 'reviewed') return pt.sessionStatus === 'summary_ready';
+  const filteredPatients = queue.filter(pt => {
+    const matchesSearch =
+      (pt.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (pt.tokenNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (pt.chiefComplaint || '').toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    if (queueFilter === 'redflags') return (pt.redFlags && pt.redFlags.length > 0) || pt.status === 'red_flag';
+    if (queueFilter === 'pending') return pt.status === 'pending' || pt.status === 'summary_ready';
+    if (queueFilter === 'reviewed') return pt.status === 'reviewed' || pt.status === 'approved';
     return true;
   });
 
-  const handleApprove = () => {
-    approveSummary();
-    setApproveModal(false);
-    showToast(isHi ? '✓ सारांश स्वीकृत और सहेजा गया' : '✓ Summary approved and saved', 'success');
+  const handleApprove = async () => {
+    if (!summary) return;
+    try {
+      await summaryApi.approveSummary(summary.id, {
+        doctorName: doctorDisplayName,
+        doctorNotes,
+        editedFields: isEditing ? {
+          presenting_complaint: editedComplaint,
+          hpi_text: editedHpi,
+          past_medical: editedPast,
+          medications_allergies: editedMeds
+        } : {}
+      });
+      setApproveModal(false);
+      showToast(isHi ? '✓ सारांश स्वीकृत और सहेजा गया' : '✓ Summary approved and saved', 'success');
+      // Refresh summary and queue
+      const updated = await summaryApi.getSummary(activePatientId);
+      setSummary(updated);
+      fetchQueue();
+    } catch (err) {
+      showToast('Failed to approve summary', 'error');
+    }
   };
 
-  const handleReject = () => {
-    if (!rejectReason.trim()) return;
-    rejectSummary(rejectReason);
-    setRejectModal(false);
-    showToast(isHi ? 'सारांश अस्वीकार कर दिया गया' : 'Summary rejected', 'info');
+  const handleReject = async () => {
+    if (!rejectReason.trim() || !summary) return;
+    try {
+      await summaryApi.rejectSummary(summary.id, {
+        reason: rejectReason,
+        doctorName: doctorDisplayName
+      });
+      setRejectModal(false);
+      showToast(isHi ? 'सारांश अस्वीकार कर दिया गया' : 'Summary rejected', 'info');
+      const updated = await summaryApi.getSummary(activePatientId);
+      setSummary(updated);
+      fetchQueue();
+    } catch (err) {
+      showToast('Failed to reject summary', 'error');
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    if (!summary) return;
+    try {
+      await summaryApi.addNote(summary.id, { noteText: doctorNotes });
+      setShowNotesModal(false);
+      showToast(isHi ? 'टिप्पणी सहेजी गई' : 'Notes saved successfully', 'success');
+    } catch (err) {
+      showToast('Failed to save notes', 'error');
+    }
   };
 
   return (
@@ -107,7 +235,7 @@ export default function DoctorDashboard() {
             </div>
             <p className="text-xs text-gray-500 mt-1">
               <span className="font-semibold text-gray-700">{doctorDisplayName}</span>
-              {' '}• {isHi ? 'सामान्य चिकित्सा विभाग • रोगी कतार एवं नैदानिक सारांश' : 'General Medicine OPD • AI-Drafted Pre-Consultation Summaries'}
+              {' '}• {isHi ? 'सामान्य चिकित्सा विभाग • वास्तविक डेटा एवं नैदानिक सारांश' : 'General Medicine OPD • Live Database Case Summaries'}
             </p>
           </div>
 
@@ -125,9 +253,9 @@ export default function DoctorDashboard() {
         {/* Source tag legend */}
         <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-2xl border border-gray-200 text-xs text-gray-600">
           <span className="font-bold text-gray-700 text-[11px] uppercase tracking-wide">Source Legend:</span>
-          <span className="flex items-center gap-1.5">🟢 <span>Patient-Reported</span></span>
-          <span className="flex items-center gap-1.5">🔵 <span>Doc-Extracted</span></span>
-          <span className="flex items-center gap-1.5">🟡 <span>AI-Draft</span></span>
+          <span className="flex items-center gap-1.5"><SourceTag source="patient" /> <span>Patient-Reported</span></span>
+          <span className="flex items-center gap-1.5"><SourceTag source="document" /> <span>Doc-Extracted</span></span>
+          <span className="flex items-center gap-1.5"><SourceTag source="ai" /> <span>AI-Draft</span></span>
         </div>
 
         {/* Main Grid: OPD Queue Rail (4 cols) + Clinical Summary View (8 cols) */}
@@ -140,8 +268,20 @@ export default function DoctorDashboard() {
                 <span>{isHi ? 'ओपीडी कतार (OPD Queue)' : 'OPD Queue'}</span>
               </h3>
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-mint-100 text-brand">
-                {SYNTHETIC_PATIENTS.length} Waiting
+                {queue.length} Waiting
               </span>
+            </div>
+
+            {/* Search in Queue */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search queue..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-brand"
+              />
             </div>
 
             {/* Filter bar */}
@@ -149,64 +289,68 @@ export default function DoctorDashboard() {
               {[
                 { key: 'all', labelEn: 'All', labelHi: 'सभी' },
                 { key: 'pending', labelEn: 'Pending', labelHi: 'लंबित' },
-                { key: 'redflags', labelEn: 'Red Flags', labelHi: 'रेड फ्लैग' },
-                { key: 'reviewed', labelEn: 'Ready', labelHi: 'तैयार' },
-              ].map(f => (
+                { key: 'redflags', labelEn: 'Red Flags', labelHi: 'अलर्ट्स' },
+                { key: 'reviewed', labelEn: 'Reviewed', labelHi: 'समीक्षित' },
+              ].map(({ key, labelEn, labelHi }) => (
                 <button
-                  key={f.key}
-                  onClick={() => setQueueFilter(f.key)}
-                  className={`flex-1 py-1 px-2 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all ${
-                    queueFilter === f.key
-                      ? 'bg-white text-brand shadow-sm'
+                  key={key}
+                  onClick={() => setQueueFilter(key)}
+                  className={`flex-1 py-1 px-2 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${
+                    queueFilter === key
+                      ? 'bg-white text-brand shadow-sm font-bold'
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {isHi ? f.labelHi : f.labelEn}
+                  {isHi ? labelHi : labelEn}
                 </button>
               ))}
             </div>
 
-            <div className="space-y-2.5">
-              {filteredPatients.length === 0 && (
+            {/* Patient Cards List */}
+            <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+              {loadingQueue ? (
+                <div className="py-8 text-center text-xs text-gray-400">Loading queue...</div>
+              ) : filteredPatients.length === 0 ? (
                 <p className="text-xs text-gray-400 text-center py-4">
                   {isHi ? 'कोई रोगी नहीं मिला' : 'No patients match this filter'}
                 </p>
+              ) : (
+                filteredPatients.map((pt) => {
+                  const isSelected = pt.id === activePatientId;
+                  const hasRedFlag = pt.redFlags && pt.redFlags.length > 0;
+
+                  return (
+                    <button
+                      key={pt.id}
+                      onClick={() => setActivePatientId(pt.id)}
+                      className={`w-full p-3.5 rounded-2xl border text-left transition-all min-h-[72px] ${
+                        isSelected
+                          ? 'bg-mint-100/70 border-brand shadow-sm ring-1 ring-brand/20'
+                          : 'bg-white hover:bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-xs text-gray-900">{pt.name}</span>
+                        <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-white text-gray-600 border border-gray-200">
+                          {pt.tokenNumber}
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] text-gray-500 flex items-center justify-between mb-1.5">
+                        <span>{pt.age}Y • {pt.gender}</span>
+                        <span className="text-[10px] text-gray-400">{pt.timeWaiting}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-gray-700 truncate font-medium flex-1">
+                          {typeof pt.chiefComplaint === 'object' ? pt.chiefComplaint.en : pt.chiefComplaint}
+                        </span>
+                        <StatusChip status={pt.status || (hasRedFlag ? 'red_flag' : 'pending')} />
+                      </div>
+                    </button>
+                  );
+                })
               )}
-              {filteredPatients.map((pt) => {
-                const isSelected = pt.id === currentPatient.id;
-                const hasRedFlag = pt.redFlags && pt.redFlags.length > 0;
-
-                return (
-                  <button
-                    key={pt.id}
-                    onClick={() => selectDoctorPatient(pt.id)}
-                    className={`w-full p-3.5 rounded-2xl border text-left transition-all min-h-[72px] ${
-                      isSelected
-                        ? 'bg-mint-100/70 border-brand shadow-sm ring-1 ring-brand/20'
-                        : 'bg-white hover:bg-gray-50 border-gray-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-xs text-gray-900">{pt.name}</span>
-                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-white text-gray-600 border border-gray-200">
-                        {pt.tokenNumber}
-                      </span>
-                    </div>
-
-                    <div className="text-[11px] text-gray-500 flex items-center justify-between mb-1.5">
-                      <span>{pt.age}Y • {pt.gender}</span>
-                      <span className="text-[10px] text-gray-400">{pt.timeWaiting}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] text-gray-700 truncate font-medium flex-1">
-                        {typeof pt.chiefComplaint === 'object' ? pt.chiefComplaint.en : pt.chiefComplaint}
-                      </span>
-                      <StatusChip status={pt.sessionStatus || (hasRedFlag ? 'red_flag' : 'pending')} />
-                    </div>
-                  </button>
-                );
-              })}
             </div>
           </div>
 
@@ -224,7 +368,7 @@ export default function DoctorDashboard() {
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 font-semibold">
                       {currentPatient.tokenNumber}
                     </span>
-                    <StatusChip status={currentPatient.sessionStatus || 'pending'} />
+                    <StatusChip status={status} />
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">
                     Age: {currentPatient.age} Y • Gender: {currentPatient.gender} • ABHA: <span className="font-mono">{currentPatient.abhaId || '91-8765-4321-0987'}</span>
@@ -234,7 +378,7 @@ export default function DoctorDashboard() {
 
               <div className="text-right text-xs text-gray-500 sm:border-l sm:border-gray-100 sm:pl-4">
                 <span className="block text-[11px] text-gray-400">Case Taken:</span>
-                <span className="font-semibold text-gray-800">23 Oct 2026, 10:24 AM</span>
+                <span className="font-semibold text-gray-800">{currentPatient.timeWaiting || 'Today'}</span>
               </div>
             </div>
 
@@ -281,9 +425,18 @@ export default function DoctorDashboard() {
                       <h4 className="font-bold text-xs text-gray-900 uppercase tracking-wider">Presenting Complaint</h4>
                       <SourceTag source="patient" />
                     </div>
-                    <p className="text-xs text-gray-700 bg-gray-50 p-2.5 rounded-xl border border-gray-100 leading-relaxed">
-                      • {summary.presentingComplaint || (typeof currentPatient.chiefComplaint === 'object' ? currentPatient.chiefComplaint.en : currentPatient.chiefComplaint || 'Headache for 3 days, moderate intensity')}
-                    </p>
+                    {isEditing ? (
+                      <textarea
+                        value={editedComplaint}
+                        onChange={(e) => setEditedComplaint(e.target.value)}
+                        rows={2}
+                        className="w-full text-xs text-gray-800 p-2.5 rounded-xl border border-mint-300 focus:outline-none focus:ring-1 focus:ring-brand"
+                      />
+                    ) : (
+                      <p className="text-xs text-gray-700 bg-gray-50 p-2.5 rounded-xl border border-gray-100 leading-relaxed">
+                        • {summary?.presentingComplaint || currentPatient.chiefComplaint || 'General checkup'}
+                      </p>
+                    )}
                   </div>
 
                   {/* History of Present Illness (HPI) */}
@@ -292,12 +445,18 @@ export default function DoctorDashboard() {
                       <h4 className="font-bold text-xs text-gray-900 uppercase tracking-wider">History of Present Illness (HPI)</h4>
                       <SourceTag source="patient" />
                     </div>
-                    <ul className="text-xs text-gray-700 bg-gray-50 p-2.5 rounded-xl border border-gray-100 space-y-1 leading-relaxed">
-                      <li>• Associated with mild fever and generalized body ache</li>
-                      <li>• Gradual onset over past 3 days; throbbing character</li>
-                      <li>• No vomiting, nausea, or neck rigidity reported</li>
-                      <li>• No visual disturbances or aura</li>
-                    </ul>
+                    {isEditing ? (
+                      <textarea
+                        value={editedHpi}
+                        onChange={(e) => setEditedHpi(e.target.value)}
+                        rows={3}
+                        className="w-full text-xs text-gray-800 p-2.5 rounded-xl border border-mint-300 focus:outline-none focus:ring-1 focus:ring-brand"
+                      />
+                    ) : (
+                      <p className="text-xs text-gray-700 bg-gray-50 p-2.5 rounded-xl border border-gray-100 leading-relaxed whitespace-pre-line">
+                        • {summary?.hpi || 'No acute symptoms reported.'}
+                      </p>
+                    )}
                   </div>
 
                   {/* Past Medical History */}
@@ -306,9 +465,18 @@ export default function DoctorDashboard() {
                       <h4 className="font-bold text-xs text-gray-900 uppercase tracking-wider">Past History</h4>
                       <SourceTag source="patient" />
                     </div>
-                    <p className="text-xs text-gray-700 bg-gray-50 p-2.5 rounded-xl border border-gray-100 leading-relaxed">
-                      • {summary.pastHistory || (currentPatient.history?.pastMedical?.en) || 'No known chronic medical illness'}
-                    </p>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editedPast}
+                        onChange={(e) => setEditedPast(e.target.value)}
+                        className="w-full text-xs text-gray-800 p-2 rounded-xl border border-mint-300 focus:outline-none focus:ring-1 focus:ring-brand"
+                      />
+                    ) : (
+                      <p className="text-xs text-gray-700 bg-gray-50 p-2.5 rounded-xl border border-gray-100 leading-relaxed">
+                        • {summary?.pastHistory || 'No known chronic medical illness'}
+                      </p>
+                    )}
                   </div>
 
                   {/* Current Medications & Allergies */}
@@ -317,10 +485,18 @@ export default function DoctorDashboard() {
                       <h4 className="font-bold text-xs text-gray-900 uppercase tracking-wider">Medications & Allergies</h4>
                       <SourceTag source="patient" />
                     </div>
-                    <div className="text-xs text-gray-700 bg-gray-50 p-2.5 rounded-xl border border-gray-100 space-y-1">
-                      <p>• {currentPatient.history?.medications?.en || 'Not on regular chronic medications'}</p>
-                      <p>• No known drug allergies (NKDA)</p>
-                    </div>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editedMeds}
+                        onChange={(e) => setEditedMeds(e.target.value)}
+                        className="w-full text-xs text-gray-800 p-2 rounded-xl border border-mint-300 focus:outline-none focus:ring-1 focus:ring-brand"
+                      />
+                    ) : (
+                      <p className="text-xs text-gray-700 bg-gray-50 p-2.5 rounded-xl border border-gray-100 leading-relaxed">
+                        • {summary?.medicationsAllergies || 'No known regular medications or drug allergies'}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -334,26 +510,17 @@ export default function DoctorDashboard() {
                         {isHi ? 'रेड फ्लैग अलर्ट्स' : 'Red Flag Alerts'}
                       </h4>
                     </div>
-                    {currentPatient.redFlags && currentPatient.redFlags.length > 0 ? (
+                    {redFlags.length > 0 ? (
                       <ul className="text-xs text-red-800 space-y-1.5 pl-1 leading-relaxed">
-                        {currentPatient.redFlags.map((rf, i) => (
+                        {redFlags.map((rf, i) => (
                           <li key={i} className="flex items-start gap-1.5">
                             <span className="font-bold text-red-600">•</span>
-                            <span>{rf.message_en || rf.keyword}</span>
+                            <span>{rf.message || rf.keyword || rf.alert_message}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <ul className="text-xs text-red-800 space-y-1.5 pl-1 leading-relaxed">
-                        <li className="flex items-start gap-1.5">
-                          <span className="font-bold text-red-600">•</span>
-                          <span>Persistent headache (&gt; 3 days duration)</span>
-                        </li>
-                        <li className="flex items-start gap-1.5">
-                          <span className="font-bold text-red-600">•</span>
-                          <span>Elevated ESR marker (28 mm/hr from digitized lab report)</span>
-                        </li>
-                      </ul>
+                      <p className="text-xs text-gray-500 italic">No critical red flags detected for this patient.</p>
                     )}
                     <span className="block text-[10px] text-red-600 italic">
                       *Rule-based deterministic alert; does not replace clinical evaluation.
@@ -361,7 +528,7 @@ export default function DoctorDashboard() {
                   </div>
 
                   {/* CRITICAL: Strictly renamed panel per Rule 1 */}
-                  {/* "AI Draft Observations (for physician review)" — Facts/Abnormal values only, NO DIAGNOSIS */}
+                  {/* "AI Draft Observations (for physician review)" — Facts only, NO DIAGNOSIS */}
                   <div className="bg-emerald-50/70 rounded-3xl p-5 border border-emerald-200 shadow-sm space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -374,18 +541,9 @@ export default function DoctorDashboard() {
                     </div>
 
                     <div className="text-xs text-emerald-900 leading-relaxed bg-white/70 p-3 rounded-2xl border border-emerald-100 space-y-2">
-                      {currentPatient.aiDraftObservation?.text?.en ? (
-                        <p>{currentPatient.aiDraftObservation.text.en}</p>
-                      ) : (
-                        <>
-                          <p>
-                            Reported acute febrile symptoms of 3 days duration with mild low-grade fever and localized frontal headache.
-                          </p>
-                          <p>
-                            Scanned lab report reveals elevated inflammatory marker (ESR 28 mm/hr, ref: 0-20) and mild anemia (Hb 11.2 g/dL, ref: 12-15.5).
-                          </p>
-                        </>
-                      )}
+                      <p>
+                        {summary?.aiDraftObservations || 'Reported symptoms recorded for physician correlation. Kindly correlate clinically.'}
+                      </p>
                       <p className="font-semibold text-emerald-800 text-[11px] pt-1 border-t border-emerald-100">
                         Kindly correlate clinically. (No autonomous diagnosis rendered).
                       </p>
@@ -407,26 +565,40 @@ export default function DoctorDashboard() {
                   <SourceTag source="document" />
                 </div>
 
-                <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-2 text-xs">
-                  <div className="flex justify-between font-bold text-gray-900">
-                    <span>Dr. Lal PathLabs — Complete Blood Count (CBC) & ESR</span>
-                    <span className="text-gray-500">12 Oct 2026</span>
+                {reports.length === 0 ? (
+                  <div className="text-center py-12 space-y-2">
+                    <FileText className="w-10 h-10 text-gray-300 mx-auto" />
+                    <p className="text-xs font-bold text-gray-700">No document scanned yet for this patient</p>
+                    <p className="text-[11px] text-gray-400">
+                      Upload lab reports or prescriptions to see real extracted parameters.
+                    </p>
                   </div>
-                  <div className="divide-y divide-gray-200/60 pt-2">
-                    {(currentPatient.labResults || [
-                      { parameter: 'Hemoglobin (Hb)', value: '11.2 g/dL', isAbnormal: true, referenceRange: '12.0 - 15.5' },
-                      { parameter: 'ESR (Westergren)', value: '28 mm/hr', isAbnormal: true, referenceRange: '0 - 20' },
-                      { parameter: 'Total Leukocyte Count (TLC)', value: '7,400 /mcL', isAbnormal: false, referenceRange: '4000 - 11000' },
-                    ]).map((lab, i) => (
-                      <div key={i} className="py-1.5 flex justify-between">
-                        <span>{lab.parameter}</span>
-                        <span className={`font-mono font-bold ${lab.isAbnormal ? 'text-red-700' : 'text-gray-700'}`}>
-                          {lab.value} {lab.unit || ''} {lab.isAbnormal ? `(High, Ref: ${lab.referenceRange})` : `(Normal, Ref: ${lab.referenceRange})`}
-                        </span>
+                ) : (
+                  <div className="space-y-4">
+                    {reports.map((doc, idx) => (
+                      <div key={doc.id || idx} className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3 text-xs">
+                        <div className="flex justify-between font-bold text-gray-900">
+                          <span>{doc.filename || doc.original_filename}</span>
+                          <span className="text-gray-500">{doc.reportDate || 'Recent'}</span>
+                        </div>
+                        {doc.findings && doc.findings.length > 0 ? (
+                          <div className="divide-y divide-gray-200/60 pt-1">
+                            {doc.findings.map((f, fi) => (
+                              <div key={fi} className="py-1.5 flex justify-between items-center">
+                                <span className="text-gray-700 font-medium">{f.test}</span>
+                                <span className={`font-mono font-bold ${f.status === 'High' ? 'text-red-700' : f.status === 'Low' ? 'text-amber-700' : 'text-gray-700'}`}>
+                                  {f.value} {f.unit} {f.refRange ? `(Ref: ${f.refRange})` : ''}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-gray-400 italic">No tabular lab entities extracted from this document.</p>
+                        )}
                       </div>
                     ))}
                   </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -441,30 +613,12 @@ export default function DoctorDashboard() {
                   <SourceTag source="patient" />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3.5 rounded-2xl bg-mint-50/60 border border-mint-200">
-                    <span className="text-[10px] font-bold text-brand uppercase block mb-1">Prakriti</span>
-                    <span className="font-bold text-gray-900 text-sm">
-                      {currentPatient.ayurvedaProfile?.prakriti?.en || 'Pitta-Vata'}
-                    </span>
-                    <p className="text-[11px] text-gray-600 mt-1">Medium build, warm skin, quick activity bursts</p>
-                  </div>
-
-                  <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200">
-                    <span className="text-[10px] font-bold text-amber-800 uppercase block mb-1">Agni (Digestion)</span>
-                    <span className="font-bold text-gray-900 text-sm">
-                      {currentPatient.ayurvedaProfile?.agni?.type || 'Tikshnagni'}
-                    </span>
-                    <p className="text-[11px] text-gray-600 mt-1">Strong appetite, frequent thirst</p>
-                  </div>
-
-                  <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200">
-                    <span className="text-[10px] font-bold text-blue-800 uppercase block mb-1">Koshta (Bowels)</span>
-                    <span className="font-bold text-gray-900 text-sm">
-                      {currentPatient.ayurvedaProfile?.koshta?.type || 'Madhyama'}
-                    </span>
-                    <p className="text-[11px] text-gray-600 mt-1">Regular daily bowel habits</p>
-                  </div>
+                <div className="p-4 rounded-2xl bg-mint-50/60 border border-mint-200 text-xs text-gray-800 leading-relaxed">
+                  {summary?.ayurvedicAssessment ? (
+                    <p className="font-semibold text-brand text-sm">{summary.ayurvedicAssessment}</p>
+                  ) : (
+                    <p className="text-gray-500 italic">No Ayurvedic intake completed for this patient yet.</p>
+                  )}
                 </div>
 
                 <span className="block text-[10px] text-gray-400 italic">
@@ -477,7 +631,7 @@ export default function DoctorDashboard() {
             <div className="bg-white rounded-3xl p-4 sm:p-5 border border-[#E2EFE7] shadow-card flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => navigate('/summary')}
+                  onClick={() => navigate(`/summary?patientId=${activePatientId}`)}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-xs transition-colors min-h-[44px]"
                 >
                   <ClipboardList className="w-4 h-4 text-gray-500" />
@@ -525,7 +679,7 @@ export default function DoctorDashboard() {
                 <h3 className="font-bold text-base text-gray-900">Approve Summary?</h3>
               </div>
               <p className="text-xs text-gray-500 leading-relaxed">
-                Are you sure you want to approve this AI draft summary? This will mark the case as reviewed and approved for the patient record.
+                Are you sure you want to approve this AI draft summary? This will save the approved status and any edits to the hospital records.
               </p>
               <div className="flex justify-end gap-2 pt-1">
                 <button
@@ -565,11 +719,7 @@ export default function DoctorDashboard() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    updateDoctorNote(doctorNotes);
-                    setShowNotesModal(false);
-                    showToast('Notes saved successfully', 'success');
-                  }}
+                  onClick={handleSaveNotes}
                   className="px-4 py-2 rounded-xl text-xs font-semibold bg-brand text-white shadow-button-green"
                 >
                   Save Notes

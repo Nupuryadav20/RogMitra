@@ -11,13 +11,14 @@ import AppLayout from '../layouts/AppLayout';
 import StepperBar from '../components/StepperBar';
 import useAppStore from '../store/appStore';
 import { ayurvedaPillars, AYURVEDA_DISCLAIMER_EN, AYURVEDA_DISCLAIMER_HI } from '../data/ayurvedaQuestions';
+import { ayurvedaApi } from '../services/api';
 
 export default function AyurvedaPage() {
   const { i18n } = useTranslation();
   const isHi = i18n.language?.startsWith('hi');
   const navigate = useNavigate();
 
-  const { ayurveda, saveAyurvedaAnswer } = useAppStore();
+  const { user, interview, ayurveda, saveAyurvedaAnswer } = useAppStore();
 
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [selectedOptions, setSelectedOptions] = useState(ayurveda.answers || {});
@@ -31,10 +32,17 @@ export default function AyurvedaPage() {
     saveAyurvedaAnswer(questionId, optionId);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (activeStepIndex < ayurvedaPillars.length - 1) {
       setActiveStepIndex(activeStepIndex + 1);
     } else {
+      if (interview?.sessionId) {
+        try {
+          await ayurvedaApi.submitAssessment(interview.sessionId, selectedOptions);
+        } catch (err) {
+          console.error('Ayurveda submit error:', err);
+        }
+      }
       navigate('/summary');
     }
   };

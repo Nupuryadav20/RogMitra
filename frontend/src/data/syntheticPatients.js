@@ -60,21 +60,14 @@ export const ananyaVerma = {
     social: { en: 'Non-smoker, non-drinker, vegetarian, software engineer', hi: 'धूम्रपान नहीं, शराब नहीं, शाकाहारी, सॉफ़्टवेयर इंजीनियर' },
   },
 
-  labResults: [
-    { parameter: 'ESR', value: 48, unit: 'mm/hr', referenceRange: '0–20', isAbnormal: true, _tag: '🔵' },
-    { parameter: 'Hemoglobin', value: 11.2, unit: 'g/dL', referenceRange: '12–15 (F)', isAbnormal: true, _tag: '🔵' },
-    { parameter: 'WBC', value: 11800, unit: '/µL', referenceRange: '4000–11000', isAbnormal: true, _tag: '🔵' },
-    { parameter: 'Platelets', value: 220000, unit: '/µL', referenceRange: '150000–400000', isAbnormal: false, _tag: '🔵' },
-    { parameter: 'CRP', value: 24, unit: 'mg/L', referenceRange: '<5', isAbnormal: true, _tag: '🔵' },
-    { parameter: 'Blood Sugar (F)', value: 88, unit: 'mg/dL', referenceRange: '70–100', isAbnormal: false, _tag: '🔵' },
-  ],
+  labResults: [],
 
   aiDraftObservation: {
     _tag: '🟡',
     _disclaimer: 'AI Draft Observations (for physician review) — NOT a diagnosis',
     text: {
-      en: 'Patient presents with 5-day history of bilateral frontal headache, low-grade fever (38.6°C), and elevated inflammatory markers (ESR 48, CRP 24, leukocytosis). Differential considerations include viral syndrome, sinusitis, or early CNS infection. Physician evaluation required.',
-      hi: 'रोगी को 5 दिनों से द्विपक्षीय ललाट सिरदर्द, निम्न-श्रेणी बुखार (38.6°C), और उच्च सूजन मार्कर (ESR 48, CRP 24, ल्यूकोसाइटोसिस) है। विभेदक विचार: वायरल सिंड्रोम, साइनसाइटिस, या प्रारंभिक CNS संक्रमण। चिकित्सक मूल्यांकन आवश्यक।',
+      en: 'Patient presents with 5-day history of bilateral frontal headache and low-grade fever. Reported acute febrile symptoms. Kindly correlate clinically.',
+      hi: 'रोगी को 5 दिनों से द्विपक्षीय ललाट सिरदर्द और हल्का बुखार है। रिपोर्ट किए गए तीव्र ज्वर लक्षण। कृपया चिकित्सकीय रूप से सहसंबंधित करें।',
     },
   },
 
@@ -137,21 +130,14 @@ export const rajanMehra = {
     social: { en: 'Smoker (20 pack-years, quit 2 years ago), occasional alcohol, sedentary lifestyle', hi: 'धूम्रपान (20 पैक-वर्ष, 2 साल पहले छोड़ा), कभी-कभी शराब, बैठे रहने की जीवनशैली' },
   },
 
-  labResults: [
-    { parameter: 'Troponin-I', value: 0.42, unit: 'ng/mL', referenceRange: '<0.04', isAbnormal: true, _tag: '🔵' },
-    { parameter: 'CK-MB', value: 28, unit: 'U/L', referenceRange: '<25', isAbnormal: true, _tag: '🔵' },
-    { parameter: 'Blood Sugar (R)', value: 218, unit: 'mg/dL', referenceRange: '<140', isAbnormal: true, _tag: '🔵' },
-    { parameter: 'Creatinine', value: 1.3, unit: 'mg/dL', referenceRange: '0.7–1.2', isAbnormal: true, _tag: '🔵' },
-    { parameter: 'eGFR', value: 62, unit: 'mL/min/1.73m²', referenceRange: '>60', isAbnormal: false, _tag: '🔵' },
-    { parameter: 'LDL Cholesterol', value: 162, unit: 'mg/dL', referenceRange: '<100', isAbnormal: true, _tag: '🔵' },
-  ],
+  labResults: [],
 
   aiDraftObservation: {
     _tag: '🟡',
     _disclaimer: 'AI Draft Observations (for physician review) — NOT a diagnosis',
     text: {
-      en: 'Patient presents with acute severe chest pain (9/10), radiation to left arm, diaphoresis, and breathlessness in a high-risk patient (55M, HTN, DM, smoking history, family history of MI). Elevated Troponin-I 0.42. Immediate physician evaluation required — possible ACS/STEMI.',
-      hi: 'उच्च जोखिम वाले रोगी (55 पुरुष, उच्च रक्तचाप, मधुमेह, धूम्रपान इतिहास, MI का पारिवारिक इतिहास) में तीव्र छाती दर्द (9/10), बाएं हाथ तक फैलाव, पसीना, और सांस की तकलीफ। ट्रोपोनिन-I 0.42 ऊंचा। तत्काल चिकित्सक मूल्यांकन आवश्यक — संभावित ACS/STEMI।',
+      en: 'Patient presents with acute severe chest pain radiating to left arm with diaphoresis and breathlessness in a diabetic and hypertensive individual. Immediate emergency physician evaluation advised.',
+      hi: 'मधुमेह और उच्च रक्तचाप वाले व्यक्ति में पसीना और सांस की तकलीफ के साथ बाएं हाथ तक फैलने वाला तीव्र सीने में दर्द। तत्काल आपातकालीन चिकित्सक मूल्यांकन की सलाह।',
     },
   },
 
@@ -230,13 +216,7 @@ export const priyaSharma = {
     social: { en: 'Non-smoker, non-drinker, vegetarian, yoga practitioner, teacher', hi: 'धूम्रपान नहीं, शराब नहीं, शाकाहारी, योगाभ्यासी, अध्यापक' },
   },
 
-  labResults: [
-    { parameter: 'TSH', value: 3.8, unit: 'mIU/L', referenceRange: '0.4–4.0', isAbnormal: false, _tag: '🔵' },
-    { parameter: 'Hemoglobin', value: 11.8, unit: 'g/dL', referenceRange: '12–15 (F)', isAbnormal: true, _tag: '🔵' },
-    { parameter: 'Ferritin', value: 12, unit: 'ng/mL', referenceRange: '12–150', isAbnormal: false, _tag: '🔵' },
-    { parameter: 'Vitamin D', value: 18, unit: 'ng/mL', referenceRange: '>30', isAbnormal: true, _tag: '🔵' },
-    { parameter: 'Vitamin B12', value: 210, unit: 'pg/mL', referenceRange: '200–900', isAbnormal: false, _tag: '🔵' },
-  ],
+  labResults: [],
 
   ayurvedaProfile: {
     _prototype: true,
