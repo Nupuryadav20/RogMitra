@@ -66,13 +66,23 @@ def get_patient_summary(patientId: str, db: Session = Depends(get_db)):
             "patientId": summary.patient_id,
             "status": summary.status,
             "version": summary.version,
+            "patientReportedHistory": {
+                "presentingComplaint": summary.presenting_complaint or "General Checkup",
+                "hpi": summary.hpi_text or "No acute history reported.",
+                "pastHistory": summary.past_medical or "No known chronic illnesses.",
+                "medicationsAllergies": summary.medications_allergies or "No regular medications or known allergies."
+            },
             "presentingComplaint": summary.presenting_complaint or "General Checkup",
             "hpi": summary.hpi_text or "No acute history reported.",
             "pastHistory": summary.past_medical or "No known chronic illnesses.",
             "medicationsAllergies": summary.medications_allergies or "No regular medications or known allergies.",
+            "extractedFindings": doc_findings_text or summary.document_findings,
             "documentFindings": doc_findings_text or summary.document_findings,
+            "ayurvedicHistory": ayurveda_text or summary.ayurveda_summary,
             "ayurvedicAssessment": ayurveda_text or summary.ayurveda_summary,
             "aiDraftObservations": summary.ai_draft_observations or "Reported symptoms recorded for physician correlation. (No autonomous diagnosis rendered).",
+            "doctorAssessment": summary.doctor_assessment, # Empty doctor-only field unless filled by physician
+            "doctorPlan": summary.doctor_plan,             # Empty doctor-only field unless filled by physician
             "doctorNotes": summary.doctor_notes,
             "reviewedBy": summary.reviewed_by,
             "reviewedAt": summary.reviewed_at.isoformat() if summary.reviewed_at else None,
@@ -127,13 +137,23 @@ def get_patient_summary(patientId: str, db: Session = Depends(get_db)):
         "patientId": patientId,
         "status": "draft",
         "version": 1,
+        "patientReportedHistory": {
+            "presentingComplaint": complaint,
+            "hpi": hpi_str,
+            "pastHistory": past_med,
+            "medicationsAllergies": meds
+        },
         "presentingComplaint": complaint,
         "hpi": hpi_str,
         "pastHistory": past_med,
         "medicationsAllergies": meds,
+        "extractedFindings": doc_findings_text,
         "documentFindings": doc_findings_text,
+        "ayurvedicHistory": ayurveda_text,
         "ayurvedicAssessment": ayurveda_text,
         "aiDraftObservations": ai_obs,
+        "doctorAssessment": None, # Empty doctor-only field (no AI assessment)
+        "doctorPlan": None,       # Empty doctor-only field (no AI plan)
         "doctorNotes": None,
         "reviewedBy": None,
         "reviewedAt": None,
@@ -161,8 +181,8 @@ def get_patient_summary(patientId: str, db: Session = Depends(get_db)):
 @router.post("/{summaryId}/approve")
 def approve_summary(summaryId: str, payload: SummaryReviewSchema, db: Session = Depends(get_db)):
     """
-    Physician approves the draft clinical summary and saves it to hospital records.
-    Matches either by summaryId or by patientId.
+    Physician approves the draft clinical summary and records doctor assessment/plan.
+    Rule: AI generates zero assessment/plan. Only physician fills doctor_assessment and doctor_plan.
     """
     summary = (
         db.query(ClinicalSummary)
@@ -179,6 +199,8 @@ def approve_summary(summaryId: str, payload: SummaryReviewSchema, db: Session = 
             status="approved",
             reviewed_by=payload.doctorName or "Dr. R. Sharma",
             reviewed_at=now,
+            doctor_assessment=payload.doctorAssessment or "",
+            doctor_plan=payload.doctorPlan or "",
             doctor_notes=payload.doctorNotes or ""
         )
         db.add(summary)
@@ -186,7 +208,11 @@ def approve_summary(summaryId: str, payload: SummaryReviewSchema, db: Session = 
         summary.status = "approved"
         summary.reviewed_by = payload.doctorName or "Dr. R. Sharma"
         summary.reviewed_at = now
-        if payload.doctorNotes:
+        if payload.doctorAssessment is not None:
+            summary.doctor_assessment = payload.doctorAssessment
+        if payload.doctorPlan is not None:
+            summary.doctor_plan = payload.doctorPlan
+        if payload.doctorNotes is not None:
             summary.doctor_notes = payload.doctorNotes
         if payload.editedFields:
             for k, v in payload.editedFields.items():
@@ -202,6 +228,8 @@ def approve_summary(summaryId: str, payload: SummaryReviewSchema, db: Session = 
         "summaryId": summary.id,
         "reviewedBy": summary.reviewed_by,
         "reviewedAt": now.isoformat(),
+        "doctorAssessment": summary.doctor_assessment,
+        "doctorPlan": summary.doctor_plan,
         "message": "Clinical summary approved and saved into hospital consultation records."
     }
 

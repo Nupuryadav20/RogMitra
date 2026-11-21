@@ -27,6 +27,12 @@ class RegisterPatientSchema(BaseModel):
     gender: str = "Other"
     abhaId: Optional[str] = None
 
+class DemoLoginSchema(BaseModel):
+    role: str = "patient"
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

@@ -72,6 +72,8 @@ export default function DoctorDashboard() {
   const [editedHpi, setEditedHpi] = useState('');
   const [editedPast, setEditedPast] = useState('');
   const [editedMeds, setEditedMeds] = useState('');
+  const [doctorAssessment, setDoctorAssessment] = useState('');
+  const [doctorPlan, setDoctorPlan] = useState('');
 
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [doctorNotes, setDoctorNotes] = useState('');
@@ -126,6 +128,8 @@ export default function DoctorDashboard() {
         setEditedHpi(sumData.hpi || '');
         setEditedPast(sumData.pastHistory || '');
         setEditedMeds(sumData.medicationsAllergies || '');
+        setDoctorAssessment(sumData.doctorAssessment || '');
+        setDoctorPlan(sumData.doctorPlan || '');
         setDoctorNotes(sumData.doctorNotes || '');
       }
       setLoadingSummary(false);
@@ -165,13 +169,20 @@ export default function DoctorDashboard() {
     try {
       await summaryApi.approveSummary(summary.id, {
         doctorName: doctorDisplayName,
+        doctorAssessment,
+        doctorPlan,
         doctorNotes,
         editedFields: isEditing ? {
           presenting_complaint: editedComplaint,
           hpi_text: editedHpi,
           past_medical: editedPast,
-          medications_allergies: editedMeds
-        } : {}
+          medications_allergies: editedMeds,
+          doctor_assessment: doctorAssessment,
+          doctor_plan: doctorPlan
+        } : {
+          doctor_assessment: doctorAssessment,
+          doctor_plan: doctorPlan
+        }
       });
       setApproveModal(false);
       showToast(isHi ? '✓ सारांश स्वीकृत और सहेजा गया' : '✓ Summary approved and saved', 'success');
@@ -497,6 +508,41 @@ export default function DoctorDashboard() {
                         • {summary?.medicationsAllergies || 'No known regular medications or drug allergies'}
                       </p>
                     )}
+                  </div>
+
+                  {/* Doctor-Only Assessment & Plan (Physician Entry Only) */}
+                  <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-xs text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
+                        <Stethoscope className="w-4 h-4 text-blue-700" />
+                        Physician Evaluation (Doctor Only)
+                      </h4>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold border border-blue-200">
+                        DOCTOR ONLY
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-800 block">Doctor's Assessment:</label>
+                      <textarea
+                        value={doctorAssessment}
+                        onChange={(e) => setDoctorAssessment(e.target.value)}
+                        placeholder="Enter clinical assessment / diagnosis impression (doctor-only)..."
+                        rows={2}
+                        className="w-full text-xs text-gray-800 p-2.5 rounded-xl border border-blue-200 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-800 block">Doctor's Plan:</label>
+                      <textarea
+                        value={doctorPlan}
+                        onChange={(e) => setDoctorPlan(e.target.value)}
+                        placeholder="Enter management plan, prescription, and advice (doctor-only)..."
+                        rows={2}
+                        className="w-full text-xs text-gray-800 p-2.5 rounded-xl border border-blue-200 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+                      />
+                    </div>
                   </div>
                 </div>
 

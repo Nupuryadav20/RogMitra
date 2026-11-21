@@ -61,7 +61,7 @@ export default function DoctorSummariesPage() {
               <span>{isHi ? 'रोगी सारांश समीक्षा' : 'Patient Clinical Summaries'}</span>
             </h1>
             <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              Review and sign off pre-consultation SOAP intake summaries prepared by AI.
+              Review and sign off pre-consultation clinical intake summaries prepared by AI.
             </p>
           </div>
 

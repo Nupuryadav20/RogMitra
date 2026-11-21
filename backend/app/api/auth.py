@@ -8,7 +8,7 @@ from app.db.session import get_db
 from app.db.models import User, PatientProfile, AuditLog
 from app.schemas.auth import (
     RequestOtpSchema, VerifyOtpSchema, LoginDoctorSchema,
-    MockAbhaSchema, RegisterPatientSchema, TokenResponse
+    MockAbhaSchema, RegisterPatientSchema, TokenResponse, DemoLoginSchema
 )
 from app.core.security import create_access_token, verify_password, get_password_hash
 from app.core.config import settings
@@ -212,6 +212,25 @@ def login_doctor(payload: LoginDoctorSchema, db: Session = Depends(get_db)):
         full_name=user.full_name,
         email=user.email
     )
+
+@router.post("/demo-login", response_model=TokenResponse)
+def demo_login(payload: DemoLoginSchema, db: Session = Depends(get_db)):
+    """
+    Unified demo login endpoint for tests and UI demo mode.
+    Accepts role="doctor" or role="patient".
+    """
+    if (payload.role or "").lower() == "doctor":
+        return login_doctor(LoginDoctorSchema(
+            email=payload.email or "dr.demo@hospital.org",
+            name=payload.name or "Dr. R. Sharma"
+        ), db=db)
+    else:
+        return verify_otp(VerifyOtpSchema(
+            phone=payload.phone or "demo-patient",
+            otp="123456",
+            name=payload.name or "Demo Patient",
+            role="patient"
+        ), db=db)
 
 @router.post("/mock-abha", response_model=TokenResponse)
 def mock_abha(payload: MockAbhaSchema, db: Session = Depends(get_db)):

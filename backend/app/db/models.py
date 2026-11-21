@@ -168,8 +168,12 @@ class ClinicalSummary(Base):
     document_findings = Column(Text, nullable=True)
     ayurveda_summary = Column(Text, nullable=True)
     
-    # Strictly non-diagnostic observations per Rule 1
+    # Strictly non-diagnostic observations per Rule 1 (Facts/abnormal values only; no AI diagnosis/plan)
     ai_draft_observations = Column(Text, nullable=True)
+    
+    # Doctor-only fields (strictly filled by physician, never by AI)
+    doctor_assessment = Column(Text, nullable=True)
+    doctor_plan = Column(Text, nullable=True)
     
     doctor_notes = Column(Text, nullable=True)
     rejection_reason = Column(Text, nullable=True)

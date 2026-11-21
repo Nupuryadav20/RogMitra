@@ -4,6 +4,8 @@ from typing import Optional, List, Dict, Any
 
 class SummaryReviewSchema(BaseModel):
     summaryId: Optional[str] = None
+    doctorAssessment: Optional[str] = None
+    doctorPlan: Optional[str] = None
     doctorNotes: Optional[str] = None
     editedFields: Optional[Dict[str, str]] = None
     doctorName: Optional[str] = None

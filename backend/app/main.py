@@ -15,8 +15,19 @@ from app.api.ayurveda import router as ayurveda_router
 from app.api.summary import router as summary_router
 from app.api.doctor import router as doctor_router
 
-# Auto-create all database tables
+# Auto-create all database tables and ensure schema updates
 Base.metadata.create_all(bind=engine)
+try:
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        for col in ("doctor_assessment", "doctor_plan"):
+            try:
+                conn.execute(text(f"ALTER TABLE clinical_summaries ADD COLUMN {col} TEXT"))
+                conn.commit()
+            except Exception:
+                pass
+except Exception:
+    pass
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
