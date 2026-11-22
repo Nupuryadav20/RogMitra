@@ -103,23 +103,49 @@ def run_real_http_tests():
         session_id = session_res.json()["sessionId"]
         print(f"✓ Intake session started: {session_id}")
 
-        # Save patient intake answer
+        # Save patient intake answer 1 (Chief complaint)
         answer_payload = {
             "sessionId": session_id,
             "patientId": patient_id,
             "fieldName": "chief_complaint",
-            "questionText": "What is your main complaint today?",
-            "answerText": "Severe throbbing headache with photophobia for 2 days",
-            "inputMode": "touch"
+            "questionText": "What health problem are you facing today? Please describe it in your own words.",
+            "answerText": "mujhe 2 din se sir dard aur bukhar hai",
+            "inputMode": "touch",
+            "language": "hi"
         }
         ans_res = client.post("/api/v1/session/answer", json=answer_payload, headers={
             "Authorization": f"Bearer {pat_token}"
         })
         assert ans_res.status_code == 200, f"Save answer failed: {ans_res.text}"
-        assert ans_res.json()["success"] is True
-        print(f"✓ Answer saved over HTTP: '{answer_payload['answerText']}' (Field: {answer_payload['fieldName']})")
+        ans_data = ans_res.json()
+        assert ans_data["success"] is True
+        assert ans_data["isComplete"] is False, "Interview prematurely marked complete on turn 1!"
+        assert ans_data["nextQuestion"] is not None, "nextQuestion is missing on turn 1!"
+        first_followup = ans_data["nextQuestion"]
+        print(f"✓ Answer 1 saved over HTTP: '{answer_payload['answerText']}'. Next question: {first_followup['field']} (isComplete=False)")
 
-        # Submit session
+        # Save patient answer 2 (Skip question)
+        skip_payload = {
+            "sessionId": session_id,
+            "patientId": patient_id,
+            "fieldName": first_followup["field"],
+            "questionText": first_followup.get("questionText", ""),
+            "answerText": "[SKIPPED_BY_PATIENT]",
+            "inputMode": "touch",
+            "language": "hi"
+        }
+        skip_res = client.post("/api/v1/session/answer", json=skip_payload, headers={
+            "Authorization": f"Bearer {pat_token}"
+        })
+        assert skip_res.status_code == 200, f"Skip answer failed: {skip_res.text}"
+        skip_data = skip_res.json()
+        assert skip_data["success"] is True
+        assert skip_data["isComplete"] is False
+        assert skip_data["nextQuestion"] is not None
+        assert skip_data["nextQuestion"]["field"] != first_followup["field"]
+        print(f"✓ Skipped question over HTTP: {first_followup['field']} -> Advanced to: {skip_data['nextQuestion']['field']}")
+
+        # Submit session (Finish and review)
         sub_res = client.post(f"/api/v1/session/submit/{session_id}", headers={
             "Authorization": f"Bearer {pat_token}"
         })

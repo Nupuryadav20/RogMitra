@@ -177,7 +177,7 @@ SOCRATES_QUESTIONS_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
         },
         "character": {
             "id": "fever_pattern",
-            "field": "character",
+            "field": "fever_character",
             "step": "symptoms",
             "questionEn": "Regarding the fever: does it come with chills and shivering, or sweating when it breaks?",
             "questionHi": "बुखार के बारे में: क्या यह ठंड और कंपकंपी के साथ आता है, या पसीना आकर उतरता है?",
@@ -193,7 +193,7 @@ SOCRATES_QUESTIONS_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
         },
         "severity": {
             "id": "fever_severity",
-            "field": "severity",
+            "field": "fever_severity",
             "step": "symptoms",
             "questionEn": "Have you measured your body temperature? How high does it feel?",
             "questionHi": "क्या आपने थर्मामीटर से तापमान नापा है? बुखार कितना तेज महसूस हो रहा है?",
@@ -205,6 +205,74 @@ SOCRATES_QUESTIONS_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
                 {"value": "Mild (99-100 F)", "labelEn": "Mild (99 - 100°F)", "labelHi": "हल्का (99 - 100°F)"},
                 {"value": "Moderate (101-102 F)", "labelEn": "Moderate (101 - 102°F)", "labelHi": "मध्यम (101 - 102°F)"},
                 {"value": "High (> 102 F)", "labelEn": "High (> 102°F)", "labelHi": "तेज (> 102°F)"}
+            ]
+        }
+    },
+    "cough": {
+        "character": {
+            "id": "cough_character",
+            "field": "cough_character",
+            "step": "symptoms",
+            "questionEn": "Is your cough dry, or do you bring up phlegm/mucus?",
+            "questionHi": "क्या आपकी खांसी सूखी है, या बलगम/कफ आ रहा है?",
+            "exampleChips": [
+                {"en": "Dry irritating cough", "hi": "सूखी और गले में चुभने वाली खांसी"},
+                {"en": "Cough with thick yellow phlegm", "hi": "गाढ़ा पीला बलगम आ रहा है"}
+            ],
+            "touchOptions": [
+                {"value": "Dry", "labelEn": "Dry Cough", "labelHi": "सूखी खांसी"},
+                {"value": "Productive / Phlegm", "labelEn": "With Phlegm / Mucus", "labelHi": "बलगम वाली खांसी"},
+                {"value": "Blood-tinged", "labelEn": "Blood in sputum", "labelHi": "कफ में खून"}
+            ]
+        },
+        "severity": {
+            "id": "cough_severity",
+            "field": "cough_severity",
+            "step": "symptoms",
+            "questionEn": "Does the coughing disturb your sleep or make it difficult to catch your breath?",
+            "questionHi": "क्या खांसी की वजह से रात को नींद टूटती है या सांस लेने में परेशानी होती है?",
+            "exampleChips": [
+                {"en": "Disturbs sleep at night", "hi": "रात में सोने में परेशानी होती है"},
+                {"en": "Mild cough during daytime only", "hi": "सिर्फ दिन में हल्की खांसी होती है"}
+            ],
+            "touchOptions": [
+                {"value": "Disturbs sleep", "labelEn": "Severe night coughing", "labelHi": "रात में ज्यादा"},
+                {"value": "Mild", "labelEn": "Mild daytime only", "labelHi": "हल्की दिन में"},
+                {"value": "Causes breathlessness", "labelEn": "Causes Breathlessness", "labelHi": "सांस फूलती है"}
+            ]
+        }
+    },
+    "chest_discomfort": {
+        "character": {
+            "id": "chest_character",
+            "field": "chest_character",
+            "step": "symptoms",
+            "questionEn": "Can you describe the chest sensation (e.g. heavy tightness, pressure, burning, or sharp)?",
+            "questionHi": "छाती में कैसा अहसास हो रहा है (जैसे भारीपन, दबाव, जलन या तेज चुभन)?",
+            "exampleChips": [
+                {"en": "Heavy tight band across chest", "hi": "छाती में भारी कसाव महसूस हो रहा है"},
+                {"en": "Burning in center of chest", "hi": "छाती के बीच में जलन हो रही है"}
+            ],
+            "touchOptions": [
+                {"value": "Pressure / Tightness", "labelEn": "Pressure / Tightness", "labelHi": "दबाव / भारीपन"},
+                {"value": "Burning / Acidity", "labelEn": "Burning Sensation", "labelHi": "जलन"},
+                {"value": "Sharp", "labelEn": "Sharp Stabbing", "labelHi": "तेज चुभन"}
+            ]
+        },
+        "radiation": {
+            "id": "chest_radiation",
+            "field": "chest_radiation",
+            "step": "symptoms",
+            "questionEn": "Does the chest sensation spread to your left arm, shoulder, jaw, or back?",
+            "questionHi": "क्या यह दर्द बाईं बांह, कंधे, जबड़े या पीठ तक फैलता है?",
+            "exampleChips": [
+                {"en": "Spreads to left arm and jaw", "hi": "बाईं बांह और जबड़े तक फैलता है"},
+                {"en": "Stays right in the center", "hi": "सिर्फ बीच में रहता है, कहीं नहीं फैलता"}
+            ],
+            "touchOptions": [
+                {"value": "To Left Arm/Jaw", "labelEn": "Left Arm or Jaw", "labelHi": "बाईं बांह / जबड़ा"},
+                {"value": "To Back", "labelEn": "Back / Shoulders", "labelHi": "पीठ / कंधे"},
+                {"value": "No Spread", "labelEn": "Does not spread", "labelHi": "कहीं नहीं फैलता"}
             ]
         }
     }

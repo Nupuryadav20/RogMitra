@@ -8,7 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Mic, MicOff, ArrowLeft, ArrowRight, Pause, Play, Send,
-  Volume2, AlertTriangle, CheckCircle2, MessageSquare, ChevronLeft, ChevronRight, Sparkles
+  Volume2, AlertTriangle, CheckCircle2, MessageSquare, ChevronLeft, ChevronRight,
+  Sparkles, SkipForward, X
 } from 'lucide-react';
 import AppLayout from '../layouts/AppLayout';
 import StepperBar from '../components/StepperBar';
@@ -54,7 +55,8 @@ export default function VoiceInterviewPage() {
   const [sessionId, setSessionId] = useState(interview.sessionId || null);
   const [currentQuestion, setCurrentQuestion] = useState(DEFAULT_FIRST_QUESTION);
   const [questionCount, setQuestionCount] = useState(1);
-  const estimatedTotal = 7;
+  const [showEarlyFinishModal, setShowEarlyFinishModal] = useState(false);
+  const estimatedTotal = 12;
 
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -69,18 +71,20 @@ export default function VoiceInterviewPage() {
   useEffect(() => {
     if (user?.id) {
       sessionApi.getLatestSession(user.id).then((sess) => {
-        if (sess && sess.id) {
-          setSessionId(sess.id);
+        const activeId = sess?.sessionId || sess?.id;
+        if (activeId && sess.status === 'in_progress') {
+          setSessionId(activeId);
           if (sess.answers && Array.isArray(sess.answers)) {
             sess.answers.forEach((ans) => {
-              saveAnswer(ans.field_name, ans.answer_text);
+              saveAnswer(ans.field || ans.field_name, ans.answer || ans.answer_text);
             });
             if (sess.answers.length > 0) {
               setQuestionCount(sess.answers.length + 1);
               // Fetch next adaptive question from backend
-              sessionApi.getNextQuestion(sess.id, isHi ? 'hi' : 'en').then((qData) => {
-                if (qData?.nextQuestion) {
-                  setCurrentQuestion(qData.nextQuestion);
+              sessionApi.getNextQuestion(activeId, isHi ? 'hi' : 'en').then((qData) => {
+                const nextQ = qData?.nextQuestion || (qData?.id ? qData : null);
+                if (nextQ) {
+                  setCurrentQuestion(nextQ);
                 }
               }).catch(() => {});
             }
@@ -251,7 +255,7 @@ export default function VoiceInterviewPage() {
         }
 
         // Advance to next question or complete
-        if (res?.isComplete || !res?.nextQuestion) {
+        if (res?.isComplete) {
           await sessionApi.submitSession(activeSessionId);
           navigate('/summary');
         } else if (res?.nextQuestion) {
@@ -261,14 +265,49 @@ export default function VoiceInterviewPage() {
             ? (res.nextQuestion.questionHi || res.nextQuestion.questionText)
             : (res.nextQuestion.questionEn || res.nextQuestion.questionText);
           speakQuestion(nextPrompt);
+        } else {
+          // If nextQuestion is missing in response, query backend getNextQuestion
+          try {
+            const nextQRes = await sessionApi.getNextQuestion(activeSessionId, isHi ? 'hi' : 'en');
+            const nextQ = nextQRes?.nextQuestion || (nextQRes?.id ? nextQRes : null);
+            if (nextQ) {
+              setCurrentQuestion(nextQ);
+              setQuestionCount((c) => c + 1);
+              const nextPrompt = isHi ? (nextQ.questionHi || nextQ.questionText) : (nextQ.questionEn || nextQ.questionText);
+              speakQuestion(nextPrompt);
+            } else if (nextQRes?.isComplete) {
+              await sessionApi.submitSession(activeSessionId);
+              navigate('/summary');
+            }
+          } catch (_) {}
         }
       } catch (err) {
         console.error('Save answer error:', err);
-        navigate('/summary');
       }
-    } else {
-      navigate('/summary');
     }
+  };
+
+  const handleSkipQuestion = () => {
+    handleSubmitAnswer('[SKIPPED_BY_PATIENT]');
+  };
+
+  const handleEarlyFinishConfirm = async () => {
+    setShowEarlyFinishModal(false);
+    let activeId = sessionId;
+    if (!activeId && user?.id) {
+      try {
+        const sess = await sessionApi.getLatestSession(user.id);
+        activeId = sess?.sessionId || sess?.id;
+      } catch (_) {}
+    }
+    if (activeId) {
+      try {
+        await sessionApi.submitSession(activeId);
+      } catch (e) {
+        console.warn('Submit session error:', e);
+      }
+    }
+    navigate('/summary');
   };
 
   const displayedQuestionText = isHi
@@ -278,55 +317,47 @@ export default function VoiceInterviewPage() {
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto space-y-5">
-        {/* Progress bar */}
-        <div className="bg-white rounded-2xl p-4 border border-[#E2EFE7] shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-gray-700">
-              {isHi
-                ? `प्रश्न ${questionCount} (लक्षण एवं स्वास्थ्य इतिहास)`
-                : `Question ${questionCount} (Symptoms & Clinical Intake)`}
-            </span>
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-mint-100 text-brand border border-mint-200">
-              {Math.min(95, Math.round((questionCount / estimatedTotal) * 100))}% {isHi ? 'पूर्ण' : 'done'}
-            </span>
-          </div>
-          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-brand rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, (questionCount / estimatedTotal) * 100)}%` }}
-            />
-          </div>
-        </div>
-
         {/* Navigation Header */}
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate('/dashboard')}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:text-brand hover:border-brand transition-colors min-h-[44px]"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-600 hover:text-brand hover:border-brand transition-colors min-h-[40px]"
           >
             <ChevronLeft className="w-4 h-4" />
             <span>{isHi ? 'डैशबोर्ड' : 'Dashboard'}</span>
           </button>
 
-          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-mint-100 text-brand border border-mint-200">
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-mint-100 text-brand border border-mint-200">
             {isHi ? `प्रश्न संख्या: ${questionCount}` : `Question #${questionCount}`}
           </span>
 
           <button
-            onClick={() => handleSubmitAnswer()}
-            disabled={!manualText.trim() && !transcript.trim()}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand text-white text-sm font-bold shadow-button-green hover:bg-brand-dark transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+            onClick={() => setShowEarlyFinishModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors min-h-[40px]"
+            title={isHi ? 'समय से पहले समाप्त करें और सारांश देखें' : 'Finish early and review summary'}
           >
-            <span>{isHi ? 'आगे बढ़ें' : 'Next'}</span>
-            <ChevronRight className="w-4 h-4" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />
+            <span>{isHi ? 'समाप्त करें और समीक्षा' : 'Finish & Review'}</span>
           </button>
         </div>
 
         {/* Stepper Bar (Symptoms -> History -> Lifestyle -> Review) */}
-        <StepperBar
-          steps={DIALOGUE_STEPS.map((s) => (isHi ? s.labelHi : s.labelEn))}
-          currentStep={currentStepIndex}
-        />
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#E2EFE7] shadow-sm space-y-3">
+          <StepperBar
+            steps={DIALOGUE_STEPS.map((s) => (isHi ? s.labelHi : s.labelEn))}
+            current={currentStepIndex}
+          />
+          <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
+            <span className="font-semibold text-gray-700">
+              {isHi
+                ? `अनुभाग: ${currentQuestion?.step || 'symptoms'} • प्रश्न #${questionCount}`
+                : `Section: ${currentQuestion?.step || 'symptoms'} • Question #${questionCount}`}
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full bg-mint-100 text-brand font-bold text-[11px] border border-mint-200">
+              {currentQuestion?.badge || (isHi ? 'मानक प्रश्न' : 'Standard question')}
+            </span>
+          </div>
+        </div>
 
         {/* Emergency Red Flag Alerts Banner if detected */}
         {interview.detectedRedFlags.length > 0 && (
@@ -496,25 +527,101 @@ export default function VoiceInterviewPage() {
           )}
 
           {/* Text Input / Transcription Confirmation Box */}
-          <div className="max-w-2xl mx-auto pt-4 flex gap-2">
-            <input
-              type="text"
-              value={manualText}
-              onChange={(e) => setManualText(e.target.value)}
-              placeholder={isHi ? 'अपनी प्रतिक्रिया यहां लिखें या सुधारें...' : 'Type or edit your response here...'}
-              className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent text-sm bg-gray-50/50"
-              style={{ fontSize: '16px' }}
-            />
-            <button
-              onClick={() => handleSubmitAnswer()}
-              disabled={!manualText.trim() && !transcript.trim()}
-              className="px-5 py-3 rounded-xl bg-brand hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm shadow-button-green transition-all flex items-center gap-1.5 min-h-[48px]"
-            >
-              <span>{isHi ? 'आगे' : 'Next'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+          <div className="max-w-2xl mx-auto pt-4 space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (manualText.trim() || transcript.trim())) {
+                    handleSubmitAnswer();
+                  }
+                }}
+                placeholder={isHi ? 'अपनी प्रतिक्रिया यहां लिखें या सुधारें...' : 'Type or edit your response here...'}
+                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent text-sm bg-gray-50/50"
+                style={{ fontSize: '16px' }}
+              />
+              <button
+                onClick={() => handleSubmitAnswer()}
+                disabled={!manualText.trim() && !transcript.trim()}
+                className="px-5 py-3 rounded-xl bg-brand hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm shadow-button-green transition-all flex items-center gap-1.5 min-h-[48px]"
+              >
+                <span>{isHi ? 'आगे' : 'Next'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Skip question button */}
+            <div className="flex justify-between items-center pt-1 px-1">
+              <button
+                onClick={handleSkipQuestion}
+                className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 font-medium py-1.5 px-2.5 rounded-lg hover:bg-gray-100 transition-colors"
+                title={isHi ? 'इस प्रश्न को छोड़ें और अगले पर जाएं' : 'Skip this question and move to next'}
+              >
+                <SkipForward className="w-3.5 h-3.5 text-gray-400" />
+                <span>{isHi ? 'यह प्रश्न छोड़ें (Skip question)' : 'Skip this question'}</span>
+              </button>
+
+              <button
+                onClick={() => setShowEarlyFinishModal(true)}
+                className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 font-semibold py-1 px-2 rounded-lg hover:bg-amber-50 transition-colors sm:hidden"
+              >
+                <span>{isHi ? 'समाप्त करें' : 'Finish early'}</span>
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Early Finish Confirmation Modal */}
+        {showEarlyFinishModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 border border-amber-200 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 text-amber-800 font-bold">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <span>{isHi ? 'साक्षात्कार समाप्त करें?' : 'Finish Interview Early?'}</span>
+                </div>
+                <button
+                  onClick={() => setShowEarlyFinishModal(false)}
+                  className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed space-y-1.5">
+                <p className="font-semibold">
+                  {isHi
+                    ? 'क्या आप वाकई समय से पहले समाप्त करना चाहते हैं? आपके डॉक्टर को अधूरा स्वास्थ्य इतिहास दिखाई देगा।'
+                    : 'Are you sure you want to finish early? Your doctor will see an incomplete clinical history.'}
+                </p>
+                <p className="text-[11px] text-amber-800">
+                  {isHi
+                    ? 'सभी प्रश्नों का उत्तर देने से डॉक्टर को सटीक सलाह व उपचार देने में मदद मिलती है।'
+                    : 'Completing the full intake provides essential context for the physician to formulate a proper assessment.'}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  onClick={() => setShowEarlyFinishModal(false)}
+                  className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors min-h-[40px]"
+                >
+                  {isHi ? 'जारी रखें' : 'Keep Answering'}
+                </button>
+                <button
+                  onClick={handleEarlyFinishConfirm}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm transition-all min-h-[40px]"
+                >
+                  {isHi ? 'हाँ, समाप्त करें' : 'Yes, Finish Early'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Conversation Q&A History Log */}
         <div className="bg-white rounded-2xl p-5 border border-[#E2EFE7] shadow-sm space-y-3">

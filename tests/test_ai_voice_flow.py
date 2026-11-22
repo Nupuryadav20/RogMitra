@@ -172,3 +172,146 @@ def test_red_flag_triggers_with_llm_off(db):
         assert turn_res["redFlags"][0]["severity"] == "CRITICAL"
     finally:
         settings.LLM_PROVIDER = original_provider
+
+
+def test_after_first_answer_has_next_question_and_not_complete():
+    """
+    Requirement 3A: After patient answers the first problem question with
+    'mujhe 2 din se sir dard aur bukhar hai', response MUST contain nextQuestion
+    and isComplete=False (MUST NOT prematurely end interview).
+    """
+    turn_res = DialogueManager.process_turn(
+        session_id="test-first-answer-not-complete",
+        current_field="chief_complaint",
+        answer_text="mujhe 2 din se sir dard aur bukhar hai",
+        language="hi",
+        prior_answers={}
+    )
+
+    assert turn_res["isComplete"] is False, "Interview marked complete after turn 1!"
+    assert turn_res["nextQuestion"] is not None, "nextQuestion is None after first answer!"
+    assert "field" in turn_res["nextQuestion"]
+    assert turn_res["nextQuestion"]["field"] != "onset_duration", "Failed to skip onset_duration when duration was provided!"
+
+
+def test_full_interview_requires_socrates_and_all_history_sections_before_complete():
+    """
+    Requirement 3B: Full simulated interview must ask SOCRATES attributes
+    plus systemic history sections before isComplete becomes True.
+    """
+    prior = {}
+    current_field = "chief_complaint"
+    current_answer = "mujhe 2 din se sir dard aur bukhar hai"
+
+    asked_fields = []
+    turns_count = 0
+    max_safety_turns = 25
+
+    while turns_count < max_safety_turns:
+        turns_count += 1
+        turn_res = DialogueManager.process_turn(
+            session_id="test-full-simulated-interview",
+            current_field=current_field,
+            answer_text=current_answer,
+            language="hi",
+            prior_answers=prior
+        )
+        prior = turn_res.get("answers", prior)
+
+        if turn_res["isComplete"]:
+            assert turn_res["nextQuestion"] is None
+            break
+
+        next_q = turn_res["nextQuestion"]
+        assert next_q is not None
+        next_field = next_q["field"]
+        asked_fields.append(next_field)
+
+        # Prepare for next turn
+        current_field = next_field
+        current_answer = f"Normal / no issues reported for {next_field}"
+
+    # Verify SOCRATES attributes and history sections were asked
+    assert "site" in asked_fields or "character" in asked_fields, f"SOCRATES symptom attributes missing in: {asked_fields}"
+    assert "past_medical" in asked_fields, f"past_medical was not asked: {asked_fields}"
+    assert "surgical_history" in asked_fields, f"surgical_history was not asked: {asked_fields}"
+    assert "medications" in asked_fields, f"medications was not asked: {asked_fields}"
+    assert "allergies" in asked_fields, f"allergies was not asked: {asked_fields}"
+    assert "family_history" in asked_fields, f"family_history was not asked: {asked_fields}"
+    assert "lifestyle" in asked_fields, f"lifestyle was not asked: {asked_fields}"
+
+    # Verify that the interview successfully completed only after all history sections
+    assert turn_res["isComplete"] is True
+    assert turns_count >= 8, f"Interview completed too quickly in {turns_count} turns!"
+
+
+def test_llm_exception_still_produces_rule_based_followup_and_does_not_abort():
+    """
+    Requirement 3C: When LLM raises an exception (e.g. API network timeout),
+    system must NOT crash or complete the interview, but cleanly fall back to
+    rule-based questions with the required badge.
+    """
+    with patch("app.services.dialogue.manager.call_llm_for_followup") as mock_llm:
+        mock_llm.side_effect = RuntimeError("Simulated Gemini API timeout / network failure")
+
+        turn_res = DialogueManager.process_turn(
+            session_id="test-sess-llm-exception",
+            current_field="chief_complaint",
+            answer_text="Severe pain in forehead",
+            language="hi",
+            prior_answers={}
+        )
+
+        assert turn_res["isComplete"] is False, "Interview marked complete on LLM exception!"
+        assert turn_res["nextQuestion"] is not None
+        assert turn_res["nextQuestion"]["questionSource"] == "rule-based"
+        assert turn_res["badge"] == "AI follow-up off – using standard questions"
+
+
+def test_red_flag_alert_allows_interview_to_continue():
+    """
+    Requirement 3D: Red flag alert displays emergency alert while allowing
+    the interview to continue (isComplete=False and nextQuestion present).
+    """
+    turn_res = DialogueManager.process_turn(
+        session_id="test-sess-rf-continue",
+        current_field="chief_complaint",
+        answer_text="seene mein dard aur paseena aa raha hai",
+        language="hi",
+        prior_answers={}
+    )
+
+    assert len(turn_res["redFlags"]) > 0
+    assert turn_res["redFlags"][0]["severity"] == "CRITICAL"
+    assert turn_res["isComplete"] is False, "Red flag prematurely completed interview!"
+    assert turn_res["nextQuestion"] is not None, "nextQuestion missing when red flag triggered!"
+
+
+def test_skipping_question_advances_dialogue():
+    """
+    Requirement: Skipping a question with '[SKIPPED_BY_PATIENT]' marks slot handled
+    and successfully advances to the next question.
+    """
+    # 1. Answer chief complaint
+    turn1 = DialogueManager.process_turn(
+        session_id="test-sess-skip",
+        current_field="chief_complaint",
+        answer_text="I have a headache since 2 days",
+        language="en",
+        prior_answers={}
+    )
+    first_followup_field = turn1["nextQuestion"]["field"]
+
+    # 2. Patient skips this follow-up question
+    turn2 = DialogueManager.process_turn(
+        session_id="test-sess-skip",
+        current_field=first_followup_field,
+        answer_text="[SKIPPED_BY_PATIENT]",
+        language="en",
+        prior_answers={"chief_complaint": "I have a headache since 2 days", "onset_duration": "2 days"}
+    )
+
+    assert turn2["isComplete"] is False
+    assert turn2["nextQuestion"] is not None
+    # Must NOT ask the same field that was just skipped
+    assert turn2["nextQuestion"]["field"] != first_followup_field

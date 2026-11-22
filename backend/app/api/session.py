@@ -56,7 +56,14 @@ def get_next_question(sessionId: str, language: str = "en", db: Session = Depend
 
     answers = {a.field_name: a.answer_text for a in session.answers}
     if not answers:
-        return DialogueManager.get_first_question(language=language)
+        first_q = DialogueManager.get_first_question(language=language)
+        return {
+            "redFlags": [],
+            "extracted": {},
+            "nextQuestion": first_q,
+            "isComplete": False,
+            "badge": first_q.get("badge", "Standard Question")
+        }
 
     last_ans = session.answers[-1] if session.answers else None
     last_field = last_ans.field_name if last_ans else "chief_complaint"
@@ -93,9 +100,11 @@ def save_answer(payload: AnswerSubmitSchema, db: Session = Depends(get_db)):
     )
     db.add(answer)
     db.commit()
+    db.refresh(session)
 
     # Collect prior answers
     prior_answers = {a.field_name: a.answer_text for a in session.answers}
+    prior_answers[payload.fieldName] = payload.answerText
 
     # Process adaptive dialogue turn with SOCRATES skipping and red-flag check
     turn_res = DialogueManager.process_turn(
@@ -106,6 +115,13 @@ def save_answer(payload: AnswerSubmitSchema, db: Session = Depends(get_db)):
         prior_answers=prior_answers,
         db=db
     )
+
+    next_q = turn_res.get("nextQuestion")
+    if next_q and next_q.get("step"):
+        session.current_step = next_q["step"]
+    elif turn_res.get("isComplete"):
+        session.current_step = "review"
+    db.commit()
 
     return {
         "success": True,

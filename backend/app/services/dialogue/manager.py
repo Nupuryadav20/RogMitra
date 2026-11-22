@@ -1,6 +1,7 @@
 # backend/app/services/dialogue/manager.py
 # Intelligent Adaptive Clinical Dialogue Manager with SOCRATES slot-filling,
 # deterministic bilingual red flags, adaptive skipping, and guarded LLM follow-ups.
+import logging
 from typing import Dict, Any, List, Optional
 import json
 
@@ -11,7 +12,9 @@ from app.services.dialogue.socrates import (
 )
 from app.services.dialogue.llm_client import call_llm_for_followup
 from app.services.redflags.engine import scan_for_red_flags
-from app.db.models import RedFlagAlert
+from app.db.models import RedFlagAlert, InterviewSession
+
+logger = logging.getLogger(__name__)
 
 class DialogueManager:
     """
@@ -44,7 +47,7 @@ class DialogueManager:
         db: Optional[Any] = None
     ) -> Dict[str, Any]:
         is_hi = language.startswith("hi")
-        prior = prior_answers or {}
+        prior = prior_answers if prior_answers is not None else {}
         prior[current_field] = answer_text
 
         # -------------------------------------------------------------
@@ -53,19 +56,43 @@ class DialogueManager:
         alerts = scan_for_red_flags(answer_text)
         saved_alerts = []
         if alerts and db:
+            # Lookup actual patient_id from InterviewSession if present
+            real_patient_id = session_id
+            try:
+                sess_obj = db.query(InterviewSession).filter(InterviewSession.id == session_id).first()
+                if sess_obj and sess_obj.patient_id:
+                    real_patient_id = sess_obj.patient_id
+            except Exception:
+                real_patient_id = session_id
+
             for a in alerts:
-                rf_entry = RedFlagAlert(
-                    session_id=session_id,
-                    patient_id=session_id,
-                    category=a["category"],
-                    severity=a["severity"],
-                    keyword_matched=a["keyword"],
-                    alert_message=a["message_hi"] if is_hi else a["message_en"],
-                    is_acknowledged=False
-                )
-                db.add(rf_entry)
+                # Prevent duplicate alerts for the same keyword in the same session
+                existing = None
+                try:
+                    existing = db.query(RedFlagAlert).filter(
+                        RedFlagAlert.session_id == session_id,
+                        RedFlagAlert.keyword_matched == a["keyword"]
+                    ).first()
+                except Exception:
+                    pass
+
+                if not existing:
+                    rf_entry = RedFlagAlert(
+                        session_id=session_id,
+                        patient_id=real_patient_id,
+                        category=a["category"],
+                        severity=a["severity"],
+                        keyword_matched=a["keyword"],
+                        alert_message=a["message_hi"] if is_hi else a["message_en"],
+                        is_acknowledged=False
+                    )
+                    db.add(rf_entry)
                 saved_alerts.append(a)
-            db.commit()
+            try:
+                db.commit()
+            except Exception as e:
+                logger.warning(f"Could not commit red flag alerts: {e}")
+                db.rollback()
         elif alerts:
             saved_alerts = alerts
 
@@ -94,22 +121,30 @@ class DialogueManager:
         # STEP 3: SOCRATES Slot Selection (Skipping already answered)
         # -------------------------------------------------------------
         next_q_data = None
-        socrates_order = ["site", "onset_duration", "character", "radiation", "associated_symptoms", "time_course", "exacerbating_relieving", "severity"]
+        socrates_slots = [
+            "site", "onset", "character", "radiation", "associations",
+            "time_course", "exacerbating_relieving", "severity"
+        ]
 
         # Check slots for primary symptom
-        sym_q_map = SOCRATES_QUESTIONS_MAP.get(primary_sym_id, SOCRATES_QUESTIONS_MAP["headache"])
+        sym_q_map = SOCRATES_QUESTIONS_MAP.get(primary_sym_id, SOCRATES_QUESTIONS_MAP.get("headache", {}))
 
-        for slot in socrates_order:
-            if slot in prior and prior[slot]:
-                continue
-            if slot == "onset_duration" and extraction.get("has_duration"):
-                continue # Skip asking onset/duration because patient already gave duration!
+        for slot in socrates_slots:
+            if slot == "onset":
+                if extraction.get("has_duration") or (prior.get("onset_duration") and prior["onset_duration"].strip()):
+                    continue # Patient already provided duration/onset!
+                if "onset" in sym_q_map:
+                    next_q_data = dict(sym_q_map["onset"])
+                else:
+                    next_q_data = dict(GENERIC_SOCRATES_ONSET)
+                break
 
             if slot in sym_q_map:
-                next_q_data = dict(sym_q_map[slot])
-                break
-            elif slot == "onset_duration":
-                next_q_data = dict(GENERIC_SOCRATES_ONSET)
+                q_def = sym_q_map[slot]
+                f_name = q_def.get("field", slot)
+                if f_name in prior and prior[f_name] and str(prior[f_name]).strip():
+                    continue
+                next_q_data = dict(q_def)
                 break
 
         # If primary symptom SOCRATES is satisfied, check secondary symptoms
@@ -118,41 +153,51 @@ class DialogueManager:
                 sec_map = SOCRATES_QUESTIONS_MAP.get(sec_id)
                 if sec_map:
                     for sec_slot, sec_q in sec_map.items():
-                        field_key = f"{sec_id}_{sec_slot}"
-                        if field_key not in prior and sec_slot not in prior:
-                            next_q_data = dict(sec_q)
-                            next_q_data["field"] = field_key
-                            break
+                        if sec_slot == "onset" and (extraction.get("has_duration") or prior.get("onset_duration")):
+                            continue
+                        f_name = sec_q.get("field") or f"{sec_id}_{sec_slot}"
+                        if f_name in prior and prior[f_name] and str(prior[f_name]).strip():
+                            continue
+                        next_q_data = dict(sec_q)
+                        next_q_data["field"] = f_name
+                        break
                 if next_q_data:
                     break
 
         # If symptom SOCRATES is complete, proceed to systemic medical history
         if not next_q_data:
             for sys_q in SYSTEMIC_QUESTIONS:
-                if sys_q["field"] not in prior:
+                f_name = sys_q["field"]
+                if f_name not in prior or not prior[f_name] or not str(prior[f_name]).strip():
                     next_q_data = dict(sys_q)
                     break
 
-        # If all slots filled, interview is complete!
+        # If all slots filled/skipped, interview is complete!
         if not next_q_data:
             return {
                 "redFlags": saved_alerts,
                 "extracted": extraction,
+                "answers": prior,
                 "nextQuestion": None,
                 "isComplete": True,
                 "badge": "Interview Completed"
             }
 
         # -------------------------------------------------------------
-        # STEP 4: LLM Question Generation with Strict Guardrails
+        # STEP 4: Guarded LLM Question Generation
         # -------------------------------------------------------------
-        # Attempt LLM generation if configured
-        llm_question = call_llm_for_followup(
-            symptoms=symptoms,
-            duration=extraction.get("duration"),
-            current_answer=answer_text,
-            language=language
-        )
+        # Attempt LLM generation if configured, but ONLY to suggest follow-up wording
+        llm_question = None
+        try:
+            llm_question = call_llm_for_followup(
+                symptoms=symptoms,
+                duration=extraction.get("duration"),
+                current_answer=answer_text,
+                language=language
+            )
+        except Exception as e:
+            logger.warning(f"LLM follow-up failed safely: {e}")
+            llm_question = None
 
         if llm_question:
             # LLM successfully produced a safe, validated single follow-up question
@@ -168,6 +213,7 @@ class DialogueManager:
         return {
             "redFlags": saved_alerts,
             "extracted": extraction,
+            "answers": prior,
             "nextQuestion": next_q_data,
             "isComplete": False,
             "badge": next_q_data["badge"]
